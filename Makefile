@@ -20,7 +20,7 @@ CFLAGS += -DDEBUG
 LIBS = $(shell sdl2-config --libs)
 
 SRC = $(wildcard $(SDIR)/*.c)
-OBJ = ${SRC:.cpp=.o}
+OBJ = ${SRC:.c=.o}
 HDRS = $(wildcard $(IDIR)/*.h)
 
 .PHONY: build
@@ -38,4 +38,4 @@ $(SDIR)/carts/%.o: $(SDIR)/carts/%.c $(HDRS) Makefile
 
 .PHONY: clean
 clean:
-	rm -f $(TARGET) $(OBJ) *dump* *.log
+	rm -f $(TARGET) $(OBJ) *.dump *.log

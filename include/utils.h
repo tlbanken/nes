@@ -29,18 +29,26 @@ typedef enum lid {
     LID_CART = 3,
 } lid_t;
 
-// error codes
-#define OK 0
-#define ERR 1
-
-#define PERROR(fmt, ...) \
-    fprintf(stderr, "[%s] ERROR: ", __FUNCTION__); \
-    fprintf(stderr, fmt, ##__VA_ARGS__);
-
-
 void neslog(lid_t id, const char *fmt, ...);
 void neslog_add(lid_t id, char *path);
 void neslog_init();
 void neslog_cleanup();
+void set_exit_handler(void (*func)(int));
+void exit_with_handler(int rc);
+
+// error codes
+#define OK 0
+#define ERR 1
+
+#define ERROR(fmt, ...) \
+    fprintf(stderr, "[%s] ERROR: ", __FUNCTION__); \
+    fprintf(stderr, fmt, ##__VA_ARGS__);
+
+#define WARNING(fmt, ...) \
+    fprintf(stderr, "[%s] WARNING: ", __FUNCTION__); \
+    fprintf(stderr, fmt, ##__VA_ARGS__);
+
+#define EXIT(rc) exit_with_handler(rc);
+
 
 #endif
