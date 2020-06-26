@@ -11,6 +11,7 @@
 #include <stdlib.h>
 
 #include <utils.h>
+#include <cart.h>
 
 // Memory map for the cpu address space
 typedef enum {
@@ -40,6 +41,7 @@ typedef enum {
     MC_CART_SIZE  = (49120)
 } cpu_memmap_t;
 static u8 iram[MC_IRAM_SIZE] = {0};
+static u8 cartmem[MC_CART_SIZE] = {0};
 
 // Memory map for the ppu address space
 typedef enum {
@@ -99,9 +101,9 @@ u8 cpu_read(u16 addr)
 
     // cartridge access
     if (addr >= MC_CART_START) {
-        // TODO
-        ERROR("Cart not available\n");
-        EXIT(1);
+        addr = cart_cpu_map(addr);
+        addr -= MC_CART_START;
+        return cartmem[addr];
     }
 
     // Should not get here
@@ -115,6 +117,7 @@ void cpu_write(u8 data, u16 addr)
     // internal ram access
     if (addr <= MC_IRAM_END) {
         iram[addr % MC_IRAM_SIZE] = data;
+        return;
     }
 
     // ppu register access
@@ -123,6 +126,7 @@ void cpu_write(u8 data, u16 addr)
         addr = addr - MC_PPU_START;
         addr = addr % 8;
         // ppu_reg_write(data, addr);
+        return;
     }
 
     // apu/io access
@@ -141,9 +145,10 @@ void cpu_write(u8 data, u16 addr)
 
     // cartridge access
     if (addr >= MC_CART_START) {
-        // TODO
-        ERROR("Cart not available\n");
-        EXIT(1);
+        addr = cart_cpu_map(addr);
+        addr -= MC_CART_START;
+        cartmem[addr] = data;
+        return;
     }
 
     // Should not get here
@@ -160,23 +165,27 @@ u8 ppu_read(u16 addr)
 
     // Nametable access
     if (addr >= MP_NT_START && addr <= MP_NT_END) {
+        addr -= MP_NT_START;
         return vram[addr];
     }
 
     // Nametable mirror access
     if (addr >= MP_NT_MIR_START && addr <= MP_NT_MIR_END) {
-        return vram[addr - 0x1000];
+        addr -= 0x1000;
+        addr -= MP_NT_START;
+        return vram[addr];
     }
 
     // pallete access
-    if (addr >= MP_PAL_START && addr >= MP_PAL_END) {
+    if (addr >= MP_PAL_START && addr <= MP_PAL_END) {
+        addr = cart_ppu_map(addr);
+        addr -= MP_PAL_START;
         return palmem[addr];
     }
 
     // shouldn't be anything mapped past here, but I'll throw a warning instead
     // of crashing
     WARNING("Attempt to read past ppu address $3FFF ($%04X)\n", addr);
-
     return 0;
 }
 
@@ -185,21 +194,30 @@ void ppu_write(u8 data, u16 addr)
     // Pattern table access
     if (addr <= MP_PT_END) {
         chrrom[addr] = data;
+        return;
     }
 
     // Nametable access
     if (addr >= MP_NT_START && addr <= MP_NT_END) {
+        addr -= MP_NT_START;
         vram[addr] = data;
+        return;
     }
 
     // Nametable mirror access
     if (addr >= MP_NT_MIR_START && addr <= MP_NT_MIR_END) {
-        vram[addr - 0x1000] = data;
+        addr -= 0x1000;
+        addr -= MP_NT_START;
+        vram[addr] = data;
+        return;
     }
 
     // pallete access
-    if (addr >= MP_PAL_START && addr >= MP_PAL_END) {
+    if (addr >= MP_PAL_START && addr <= MP_PAL_END) {
+        addr = cart_ppu_map(addr);
+        addr -= MP_PAL_START;
         palmem[addr] = data;
+        return;
     }
 
     // shouldn't be anything mapped past here, but I'll throw a warning instead
@@ -219,6 +237,18 @@ void mem_dump()
     fwrite(iram, 1, MC_IRAM_SIZE, ofile);
     fclose(ofile);
     ofile = NULL;
+
+    // dump pgr rom
+    ofile = fopen("cartmem.dump", "wb");
+    if (ofile == NULL) {
+        perror("fopen");
+        ERROR("Failed to dump PRG-ROM\n");
+        return;
+    }
+    fwrite(cartmem, 1, MC_CART_SIZE, ofile);
+    fclose(ofile);
+    ofile = NULL;
+
 
     // dump chrrom
     ofile = fopen("chr-rom.dump", "wb");

@@ -12,18 +12,24 @@
 
 #include <utils.h>
 #include <mem.h>
+#include <cart.h>
 
 static void sighandler(int sig)
 {
-    if (sig == SIGINT) {
-        EXIT(1);
+    if (sig == SIGSEGV) {
+        fprintf(stderr, "SEG FAULT!\n");
     }
+    if (sig == SIGINT) {
+        fprintf(stderr, "SIGINT caught!\n");
+    }
+    EXIT(1);
 }
 
 static void exit_handler(int rc)
 {
     if (rc != OK) {
         mem_dump();
+        cart_dump();
         neslog_cleanup();
     }
 }
@@ -32,12 +38,20 @@ int main(int argc, char **argv)
 {
     (void) argc, (void) argv;
 
+    if (argc != 2) {
+        fprintf(stderr, "usage: nes <rom path>\n");
+        return 1;
+    }
+
+    char *rompath = argv[1];
+
     int rc;
 
     // set up exit and signal handling
     struct sigaction sa;
     sa.sa_handler = sighandler;
     rc = sigaction(SIGINT, &sa, NULL);
+    rc = sigaction(SIGSEGV, &sa, NULL);
     assert(rc == 0);
     set_exit_handler(exit_handler);
 
@@ -45,6 +59,7 @@ int main(int argc, char **argv)
     neslog_add(LID_CPU, "cpu.log");
 
     // TODO do the nes stuff here
+    cart_load(rompath);
 
     neslog_cleanup();
     return 0;
