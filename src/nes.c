@@ -22,6 +22,9 @@ static void sighandler(int sig)
     if (sig == SIGINT) {
         fprintf(stderr, "SIGINT caught!\n");
     }
+    if (sig == SIGABRT) {
+        fprintf(stderr, "SIGABORT (caught)!\n");
+    }
     EXIT(1);
 }
 
@@ -51,7 +54,10 @@ int main(int argc, char **argv)
     struct sigaction sa;
     sa.sa_handler = sighandler;
     rc = sigaction(SIGINT, &sa, NULL);
+    assert(rc == 0);
     rc = sigaction(SIGSEGV, &sa, NULL);
+    assert(rc == 0);
+    rc = sigaction(SIGABRT, &sa, NULL);
     assert(rc == 0);
     set_exit_handler(exit_handler);
 

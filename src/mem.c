@@ -38,7 +38,7 @@ typedef enum {
     // Cartridge Space
     MC_CART_START = 0x4020,
     MC_CART_END   = 0xFFFF,
-    MC_CART_SIZE  = (49120)
+    MC_CART_SIZE  = (MC_CART_END - MC_CART_START + 1)
 } cpu_memmap_t;
 static u8 iram[MC_IRAM_SIZE] = {0};
 static u8 cartmem[MC_CART_SIZE] = {0};

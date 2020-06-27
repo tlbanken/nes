@@ -15,10 +15,6 @@
 #include <cpu.h>
 #include <mem.h>
 
-typedef struct instr {
-    u8 opcode;
-} instr_t;
-
 // static function prototypes
 #include "_cpu.h"
 
@@ -28,6 +24,8 @@ typedef struct instr {
 #define NMI_VECTOR 0xFFFA
 #define RESET_VECTOR 0xFFFC
 #define IRQ_VECTOR 0xFFFE
+
+#define LOG(fmt, ...) neslog(LID_CPU, fmt, ##__VA_ARGS__);
 
 // PSR bit field values
 typedef enum psr_flags {
@@ -43,7 +41,7 @@ typedef enum psr_flags {
 
 #define NUM_OPS 256
 
-typedef int(*op_func)(instr_t);
+typedef int(*op_func)();
 static op_func opmatrix[NUM_OPS];
 
 typedef struct cpu_state {
@@ -53,9 +51,10 @@ typedef struct cpu_state {
     u8 y;
     u8 psr;
     u8 sp;
-    u8 pc;
+    u16 pc;
 
     u32 cycle;
+    u8 op;
 } cpu_state_t;
 static cpu_state_t state;
 static cpu_state_t prev_state;
@@ -342,17 +341,20 @@ void cpu_init()
 int cpu_step()
 {
     prev_state = state;
+    LOG("%04X ", state.pc);
     // fetch instruction
     // low 4 bits = LSD
     // high 4 bits = MSD
     u8 opcode = cpu_read(state.pc++);
+    state.op = opcode;
     int op_index = ((opcode >> 4) & 0xF) * 16 + (opcode & 0xF); 
-    instr_t instr;
-    instr.opcode = opcode;
     // execute instruction
-    int clocks = opmatrix[op_index](instr);
+    int clocks = opmatrix[op_index]();
     assert(clocks != 0);
     state.cycle += clocks;
+    LOG("\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%u (+%d)\n", prev_state.acc,
+        prev_state.x, prev_state.y, prev_state.psr, prev_state.sp, prev_state.cycle,
+        clocks);
     return clocks;
 }
 
@@ -375,7 +377,7 @@ void cpu_reset()
     u16 lo = cpu_read(RESET_VECTOR);
     u16 hi = cpu_read(RESET_VECTOR + 1);
     state.pc = (hi << 8) | lo;
-    // state.pc = 0xC000; // NOTE: FOR TESTING
+    state.pc = 0xC000; // NOTE: FOR TESTING
     // state.sp = 0xFF;
     state.sp = 0xFD; // NOTE: FOR TESTING
     // state.psr = 0x34;
@@ -387,414 +389,473 @@ void cpu_reset()
     state.cycle = 7; // NOTE: FOR TESTING
 }
 
-// *** ADDRESS MODE HANDLERS ***
-static int mode_acc(u8 *fetch)
+// *** PSR HELPERS ***
+static void set_flag(psr_flags_t flag, bool cond)
 {
-    (void) fetch;
+    if (cond) {
+        state.psr |= flag;
+    } else {
+        state.psr &= ~flag;
+    }
+}
+
+// *** ADDRESS MODE HANDLERS ***
+// NOTE: Nothing to be fetched (but we log for consistancy)
+static int mode_acc()
+{
+    LOG("      ");
+    LOG(" %s A", op_to_str(state.op));
     return 0;
 }
+
 static int mode_imm(u8 *fetch)
 {
-    (void) fetch;
+    *fetch = cpu_read(state.pc++);
+    LOG(" %02X   ", *fetch);
+    LOG(" %s #$%02X", op_to_str(state.op), *fetch);
     return 0;
 }
+
 static int mode_abs(u8 *fetch, u16 *from)
 {
-    (void) fetch;
+    u16 lo = cpu_read(state.pc++);
+    u16 hi = cpu_read(state.pc++);
+    LOG(" %02X %02X", lo, hi);
+    u16 addr = (hi << 8) | lo;
+
+    *fetch = cpu_read(addr);
+    *from = addr;
+    LOG(" %s $%04X = %02X", addr, *fetch);
     return 0;
 }
+
 static int mode_zp(u8 *fetch, u16 *from)
 {
-    (void) fetch;
+    u16 zaddr = cpu_read(state.pc++);
+    LOG(" %02X   ", zaddr);
+
+    *fetch = cpu_read(zaddr);
+    *from = zaddr;
+    LOG(" %s $%02X = %02X", zaddr, *fetch);
     return 0;
 }
+
 static int mode_zpx(u8 *fetch, u16 *from)
 {
-    (void) fetch;
+    u16 zaddr = cpu_read(state.pc++);
+    LOG(" %02X   ", zaddr);
+
+    *from = (zaddr + state.x) & 0xFF;
+    *fetch = cpu_read(*from);
+    LOG(" %s $%02X,X @ %02X = %02X", op_to_str(state.op), zaddr, *from, *fetch);
     return 0;
 }
+
 static int mode_zpy(u8 *fetch, u16 *from)
 {
-    (void) fetch;
+    u16 zaddr = cpu_read(state.pc++);
+    LOG(" %02X   ", zaddr);
+
+    *from = (zaddr + state.y) & 0xFF;
+    *fetch = cpu_read(*from);
+    LOG(" %s $%02X,Y @ %02X = %02X", op_to_str(state.op), zaddr, *from, *fetch);
     return 0;
 }
+
 static int mode_absx(u8 *fetch, u16 *from)
 {
-    (void) fetch;
-    return 0;
+    u16 lo = cpu_read(state.pc++);
+    u16 hi = cpu_read(state.pc++);
+    u16 addr = (hi << 8) | lo;
+    LOG(" %02X %02X");
+
+    *from = (addr + state.x);
+    *fetch = cpu_read(*from);
+    LOG(" %s $%04X,X @ %04X = %02X", op_to_str(state.op), addr, *from, *fetch);
+    // check if extra cycle needed (from page cross)
+    return (u16)state.x + lo > 0xFF ? 1 : 0;
 }
+
 static int mode_absy(u8 *fetch, u16 *from)
 {
-    (void) fetch;
-    return 0;
+    u16 lo = cpu_read(state.pc++);
+    u16 hi = cpu_read(state.pc++);
+    u16 addr = (hi << 8) | lo;
+    LOG(" %02X %02X");
+
+    *from = (addr + state.y);
+    *fetch = cpu_read(*from);
+    LOG(" %s $%04X,Y @ %04X = %02X", op_to_str(state.op), addr, *from, *fetch);
+    // check if extra cycle needed (from page cross)
+    return (u16)state.y + lo > 0xFF ? 1 : 0;
 }
-static int mode_imp(u8 *fetch, u16 *from)
+
+// NOTE: nothing to fetch, but we still need to log
+static int mode_imp()
 {
-    (void) fetch;
+    LOG("      ");
+    LOG(" %s", op_to_str(state.op));
     return 0;
 }
-static int mode_rel(u8 *fetch, u16 *from)
+
+static int mode_rel(u16 *fetch)
 {
-    (void) fetch;
-    return 0;
+    u16 rel = cpu_read(state.pc++);
+    LOG(" %02X   ", rel);
+
+    // turn rel into a signed number (2's complement)
+    u8 carry = (rel & 0x80) >> 7;
+    rel = rel & 0x80 ? ~rel : rel;
+
+    *fetch = rel + state.pc + carry;
+    LOG(" %s $%04X", *fetch);
+    // check if page boundary crossed (bit 8 should be same if no cross)
+    return (*fetch ^ state.pc) & 0x0100 ? 1 : 0;
 }
+
 static int mode_indx(u8 *fetch, u16 *from)
 {
-    (void) fetch;
+    u16 a = cpu_read(state.pc++);
+    u16 ind_addr = (a + state.x) & 0xFF;
+    LOG(" %02X   ", a);
+
+    u16 lo = cpu_read(ind_addr);
+    u16 hi = cpu_read((ind_addr + 1) & 0xFF);
+    u16 addr = (hi << 8) | lo;
+
+    *fetch = cpu_read(addr);
+    *from = addr;
+    LOG(" %s ($%02X,X) @ %02X = %04X = %02X", op_to_str(state.op), a, ind_addr,
+        addr, *fetch);
+
     return 0;
 }
+
 static int mode_indy(u8 *fetch, u16 *from)
 {
-    (void) fetch;
-    return 0;
+    u16 ind_addr = cpu_read(state.pc++);
+    LOG(" %02X   ", ind_addr);
+
+    u16 lo = cpu_read(ind_addr);
+    u16 hi = cpu_read((ind_addr + 1) & 0xFF);
+
+    u16 addr = (hi << 8) | lo;
+    u16 yaddr = addr + state.y;
+
+    *fetch = cpu_read(yaddr);
+    *from = yaddr;
+    LOG(" %s (%02X,Y) = %04X @ %04X = %02X", op_to_str(state.op), ind_addr, addr,
+        yaddr, *fetch);
+
+    return (yaddr ^ addr) & 0x0100 ? 1 : 0;
 }
-static int mode_ind(u8 *fetch, u16 *from)
+
+static int mode_ind(u16 *fetch)
 {
-    (void) fetch;
+    u16 ind_lo = cpu_read(state.pc++);
+    u16 ind_hi = cpu_read(state.pc++);
+    LOG(" %02X %02X", ind_lo, ind_hi);
+
+    u16 ind_addr = (ind_hi << 8) | ind_lo;
+    u16 lo = cpu_read(ind_addr);
+    u16 hi;
+    // The 6502 has a bug when the indirect vector falls on a page boundary, the
+    // MSB is fetched from $xx00 instead of ($xxFF + 1). aka it wraps around.
+    if (ind_lo == 0xFF) {
+        hi = cpu_read(ind_addr & 0xFF00);
+    } else {
+        hi = cpu_read(ind_addr + 1);
+    }
+
+    *fetch = (hi << 8) | lo;
+    LOG(" %s ($%04X) = %04X", op_to_str(state.op), ind_addr, *fetch);
     return 0;
 }
 
 
 // *** INSTRUCTION HANDLERS ***
-static int undef(instr_t instr)
+static int undef()
 {
-    (void) instr;
     return 0;
 }
 
-static int adc(instr_t instr)
+static int adc()
 {
-    (void) instr;
     return 0;
 }
 
-static int and(instr_t instr)
+static int and()
 {
-    (void) instr;
     return 0;
 }
 
-static int asl(instr_t instr)
+static int asl()
 {
-    (void) instr;
     return 0;
 }
 
-static int bcc(instr_t instr)
+static int bcc()
 {
-    (void) instr;
     return 0;
 }
 
-static int bcs(instr_t instr)
+static int bcs()
 {
-    (void) instr;
     return 0;
 }
 
-static int beq(instr_t instr)
+static int beq()
 {
-    (void) instr;
     return 0;
 }
 
-static int bit(instr_t instr)
+static int bit()
 {
-    (void) instr;
     return 0;
 }
 
-static int bmi(instr_t instr)
+static int bmi()
 {
-    (void) instr;
     return 0;
 }
 
-static int bne(instr_t instr)
+static int bne()
 {
-    (void) instr;
     return 0;
 }
 
-static int bpl(instr_t instr)
+static int bpl()
 {
-    (void) instr;
     return 0;
 }
 
-static int brk(instr_t instr)
+static int brk()
 {
-    (void) instr;
     return 0;
 }
 
-static int bvc(instr_t instr)
+static int bvc()
 {
-    (void) instr;
     return 0;
 }
 
-static int bvs(instr_t instr)
+static int bvs()
 {
-    (void) instr;
     return 0;
 }
 
-static int clc(instr_t instr)
+static int clc()
 {
-    (void) instr;
     return 0;
 }
 
-static int cld(instr_t instr)
+static int cld()
 {
-    (void) instr;
     return 0;
 }
 
-static int cli(instr_t instr)
+static int cli()
 {
-    (void) instr;
     return 0;
 }
 
-static int clv(instr_t instr)
+static int clv()
 {
-    (void) instr;
     return 0;
 }
 
-static int cmp(instr_t instr)
+static int cmp()
 {
-    (void) instr;
     return 0;
 }
 
-static int cpx(instr_t instr)
+static int cpx()
 {
-    (void) instr;
     return 0;
 }
 
-static int cpy(instr_t instr)
+static int cpy()
 {
-    (void) instr;
     return 0;
 }
 
-static int dec(instr_t instr)
+static int dec()
 {
-    (void) instr;
     return 0;
 }
 
-static int dex(instr_t instr)
+static int dex()
 {
-    (void) instr;
     return 0;
 }
 
-static int dey(instr_t instr)
+static int dey()
 {
-    (void) instr;
     return 0;
 }
 
-static int eor(instr_t instr)
+static int eor()
 {
-    (void) instr;
     return 0;
 }
 
-static int inc(instr_t instr)
+static int inc()
 {
-    (void) instr;
     return 0;
 }
 
-static int inx(instr_t instr)
+static int inx()
 {
-    (void) instr;
     return 0;
 }
 
-static int iny(instr_t instr)
+static int iny()
 {
-    (void) instr;
     return 0;
 }
 
-static int jmp(instr_t instr)
+static int jmp()
 {
-    (void) instr;
     return 0;
 }
 
-static int jsr(instr_t instr)
+static int jsr()
 {
-    (void) instr;
     return 0;
 }
 
-static int lda(instr_t instr)
+static int lda()
 {
-    (void) instr;
     return 0;
 }
 
-static int ldx(instr_t instr)
+static int ldx()
 {
-    (void) instr;
     return 0;
 }
 
-static int ldy(instr_t instr)
+static int ldy()
 {
-    (void) instr;
     return 0;
 }
 
-static int lsr(instr_t instr)
+static int lsr()
 {
-    (void) instr;
     return 0;
 }
 
-static int nop(instr_t instr)
+static int nop()
 {
-    (void) instr;
     return 0;
 }
 
-static int ora(instr_t instr)
+static int ora()
 {
-    (void) instr;
     return 0;
 }
 
-static int pha(instr_t instr)
+static int pha()
 {
-    (void) instr;
     return 0;
 }
 
-static int php(instr_t instr)
+static int php()
 {
-    (void) instr;
     return 0;
 }
 
-static int pla(instr_t instr)
+static int pla()
 {
-    (void) instr;
     return 0;
 }
 
-static int plp(instr_t instr)
+static int plp()
 {
-    (void) instr;
     return 0;
 }
 
-static int rol(instr_t instr)
+static int rol()
 {
-    (void) instr;
     return 0;
 }
 
-static int ror(instr_t instr)
+static int ror()
 {
-    (void) instr;
     return 0;
 }
 
-static int rti(instr_t instr)
+static int rti()
 {
-    (void) instr;
     return 0;
 }
 
-static int rts(instr_t instr)
+static int rts()
 {
-    (void) instr;
     return 0;
 }
 
-static int sbc(instr_t instr)
+static int sbc()
 {
-    (void) instr;
     return 0;
 }
 
-static int sec(instr_t instr)
+static int sec()
 {
-    (void) instr;
     return 0;
 }
 
-static int sed(instr_t instr)
+static int sed()
 {
-    (void) instr;
     return 0;
 }
 
-static int sei(instr_t instr)
+static int sei()
 {
-    (void) instr;
     return 0;
 }
 
-static int sta(instr_t instr)
+static int sta()
 {
-    (void) instr;
     return 0;
 }
 
-static int stx(instr_t instr)
+static int stx()
 {
-    (void) instr;
     return 0;
 }
 
-static int sty(instr_t instr)
+static int sty()
 {
-    (void) instr;
     return 0;
 }
 
-static int tax(instr_t instr)
+static int tax()
 {
-    (void) instr;
     return 0;
 }
 
-static int tay(instr_t instr)
+static int tay()
 {
-    (void) instr;
     return 0;
 }
 
-static int tsx(instr_t instr)
+static int tsx()
 {
-    (void) instr;
     return 0;
 }
 
-static int txa(instr_t instr)
+static int txa()
 {
-    (void) instr;
     return 0;
 }
 
-static int txs(instr_t instr)
+static int txs()
 {
-    (void) instr;
     return 0;
 }
 
-static int tya(instr_t instr)
+static int tya()
 {
-    (void) instr;
     return 0;
 }
 
