@@ -7,14 +7,14 @@
  * Private header file for cpu.c
  */
 
-// I don't want to accidentily include this in any other file other than cpu.h
+// I don't want to accidentily include this in any other file other than cpu.c
 #ifdef __CPU_H
 #error "Only one include of _cpu.h allowed!\n"
 #else
 #define __CPU_H
 
 // address modes
-static int mode_acc();
+static int mode_acc(u8 *fetch);
 static int mode_imm(u8 *fetch);
 static int mode_abs(u8 *fetch, u16 *from);
 static int mode_zp(u8 *fetch, u16 *from);
