@@ -13,6 +13,7 @@
 #include <utils.h>
 #include <mem.h>
 #include <cart.h>
+#include <cpu.h>
 
 static void sighandler(int sig)
 {
@@ -63,6 +64,9 @@ int main(int argc, char **argv)
 
     neslog_init();
     neslog_add(LID_CPU, "cpu.log");
+
+    // init hw
+    cpu_init();
 
     // TODO do the nes stuff here
     cart_load(rompath);

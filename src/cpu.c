@@ -29,7 +29,7 @@
 #define LOG(fmt, ...) neslog(LID_CPU, fmt, ##__VA_ARGS__);
 
 // PSR bit field values
-typedef enum psr_flags {
+enum psr_flags {
     PSR_C  = (1 << 0), // carry
     PSR_Z  = (1 << 1), // zero
     PSR_I  = (1 << 2), // irq disable
@@ -38,7 +38,7 @@ typedef enum psr_flags {
     PSR_B1 = (1 << 5), // pushed onto the stack. They help determine interrupt type
     PSR_V  = (1 << 6), // Overflow
     PSR_N  = (1 << 7)  // Negative
-} psr_flags_t;
+};
 
 #define NUM_OPS 256
 
@@ -393,7 +393,7 @@ void cpu_reset()
 }
 
 // *** PSR HELPERS ***
-static void set_flag(psr_flags_t flag, bool cond)
+static void set_flag(enum psr_flags flag, bool cond)
 {
     if (cond) {
         state.psr |= flag;
@@ -758,7 +758,7 @@ static int asl()
 
     // set flags
     set_flag(PSR_C, val & 0x80);
-    set_flag(PSR_Z, state.acc == 0); // Just acc or mem too???
+    set_flag(PSR_Z, res == 0);
     set_flag(PSR_N, res & 0x80);
 
     return clocks;
@@ -1441,7 +1441,8 @@ static int jsr()
     u16 target;
     u8 dummy;
     mode_abs(&dummy, &target);
-    // push pc to stack
+    // push (pc - 1) to stack
+    state.pc--;
     cpu_write(state.pc >> 8, SP);
     state.sp--;
     cpu_write(state.pc & 0xFF, SP);
@@ -1451,138 +1452,831 @@ static int jsr()
     return 6;
 }
 
+/*
+ * LDA - Load Accumulator
+ * Size: 2-3
+ * Cycles: 2-6
+ * Flags: Z, N
+ */
 static int lda()
 {
-    return 0;
+    int clocks = 0;
+    u8 val;
+    u16 dummy;
+    int extra_clock;
+    switch (state.op) {
+    case 0xA9: // IMM -- 2 bytes, 2 cycles
+        mode_imm(&val);
+        clocks = 2;
+        break;
+    case 0xA5: // ZP -- 2 bytes, 3 cycles
+        mode_zp(&val, &dummy);
+        clocks = 3;
+        break;
+    case 0xB5: // ZPX -- 2 bytes, 4 cycles
+        mode_zpx(&val, &dummy);
+        clocks = 4;
+        break;
+    case 0xAD: // ABS -- 3 bytes, 4 cycles
+        mode_abs(&val, &dummy);
+        clocks = 4;
+        break;
+    case 0xBD: // ABSX -- 3 bytes, 4 (+1) cycles
+        extra_clock = mode_absx(&val, &dummy);
+        clocks = 4 + extra_clock;
+        break;
+    case 0xB9: // ABSY -- 3 bytes, 4 (+1) cycles
+        extra_clock = mode_absy(&val, &dummy);
+        clocks = 4 + extra_clock;
+        break;
+    case 0xA1: // INDX -- 2 bytes, 6 cycles
+        mode_indx(&val, &dummy);
+        clocks = 6;
+        break;
+    case 0xB1: // INDY -- 2 bytes, 5 (+1) cycles
+        extra_clock = mode_indy(&val, &dummy);
+        clocks = 5 + extra_clock;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // load
+    state.acc = val;
+
+    // set flags
+    set_flag(PSR_Z, state.acc == 0);
+    set_flag(PSR_N, state.acc & 0x80);
+
+    return clocks;
 }
 
+/*
+ * LDX - Load into X Register
+ * Size: 2-3
+ * Cycles: 2-5
+ * Flags: Z, N
+ */
 static int ldx()
 {
-    return 0;
+    int clocks = 0;
+    int extra_clock;
+    u16 from;
+    u8 val;
+    switch (state.op) {
+    case 0xA2: // IMM - 2 bytes, 2 cycles
+        mode_imm(&val);
+        clocks = 2;
+        break;
+    case 0xA6: // ZP - 2 bytes, 3 cycles
+        mode_zp(&val, &from);
+        clocks = 3;
+        break;
+    case 0xB6: // ZPY - 2 bytes, 4 cycles
+        mode_zpy(&val, &from);
+        clocks = 4;
+        break;
+    case 0xAE: // ABS - 3 bytes, 4 cycles
+        mode_abs(&val, &from);
+        clocks = 4;
+        break;
+    case 0xBE: // ABSY - 3 bytes, 4 (+1) cycles
+        extra_clock = mode_absy(&val, &from);
+        clocks = 4 + extra_clock;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // load
+    state.x = val;
+
+    // set flags
+    set_flag(PSR_Z, state.x == 0);
+    set_flag(PSR_N, state.x & 0x80);
+
+    return clocks;
 }
 
+/*
+ * LDY - Load into Y Register
+ * Size: 2-3
+ * Cycles: 2-5
+ * Flags: Z, N
+ */
 static int ldy()
 {
-    return 0;
+    int clocks = 0;
+    int extra_clock;
+    u16 from;
+    u8 val;
+    switch (state.op) {
+    case 0xA0: // IMM - 2 bytes, 2 cycles
+        mode_imm(&val);
+        clocks = 2;
+        break;
+    case 0xA4: // ZP - 2 bytes, 3 cycles
+        mode_zp(&val, &from);
+        clocks = 3;
+        break;
+    case 0xB4: // ZPY - 2 bytes, 4 cycles
+        mode_zpy(&val, &from);
+        clocks = 4;
+        break;
+    case 0xAC: // ABS - 3 bytes, 4 cycles
+        mode_abs(&val, &from);
+        clocks = 4;
+        break;
+    case 0xBC: // ABSY - 3 bytes, 4 (+1) cycles
+        extra_clock = mode_absy(&val, &from);
+        clocks = 4 + extra_clock;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // load
+    state.y = val;
+
+    // set flags
+    set_flag(PSR_Z, state.y == 0);
+    set_flag(PSR_N, state.y & 0x80);
+
+    return clocks;
 }
 
+/*
+ * LSR - Logical Shift Right
+ * Size: 1-3
+ * Cyclea: 2-7
+ * Flags: C, Z, N
+ */
 static int lsr()
 {
-    return 0;
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    bool inmem = true;
+    switch (state.op) {
+    case 0x4A: // ACC -- 1 byte, 2 cycles
+        mode_acc(&val);
+        clocks = 2;
+        inmem = false;
+        break;
+    case 0x46: // ZP -- 2 bytes, 5 cycles
+        mode_zp(&val, &from);
+        clocks = 5;
+        break;
+    case 0x56: // ZPX -- 2 bytes, 6 cycles
+        mode_zpx(&val, &from);
+        clocks = 6;
+        break;
+    case 0x4E: // ABS -- 3 bytes, 6 cycles
+        mode_abs(&val, &from);
+        clocks = 6;
+        break;
+    case 0x5E: // ABSX -- 3 bytes, 7 cycles
+        mode_absx(&val, &from);
+        clocks = 7;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+        break;
+    }
+
+    // shift left
+    u8 res = val >> 1;
+    if (inmem) {
+        cpu_write(res, from);
+    } else {
+        state.acc = res;
+    }
+
+    // set flags
+    set_flag(PSR_C, val & 0x01);
+    set_flag(PSR_Z, res == 0);
+    set_flag(PSR_N, false);
+
+    return clocks;
 }
 
+/*
+ * NOP - No Operation
+ * Size: 1
+ * Cycles: 2
+ * Flags: None
+ */
 static int nop()
 {
-    return 0;
+    assert(state.op == 0xEA);
+    mode_imp();
+    return 2;
 }
 
+/*
+ * ORA - Inclusive OR
+ * Size: 2-3
+ * Cycles: 2-6
+ * Flags: Z, N
+ */
 static int ora()
 {
-    return 0;
+    int clocks = 0;
+    u8 val;
+    u16 dummy;
+    int extra_clock;
+    switch (state.op) {
+    case 0x09: // IMM -- 2 bytes, 2 cycles
+        mode_imm(&val);
+        clocks = 2;
+        break;
+    case 0x05: // ZP -- 2 bytes, 3 cycles
+        mode_zp(&val, &dummy);
+        clocks = 3;
+        break;
+    case 0x15: // ZPX -- 2 bytes, 4 cycles
+        mode_zpx(&val, &dummy);
+        clocks = 4;
+        break;
+    case 0x0D: // ABS -- 3 bytes, 4 cycles
+        mode_abs(&val, &dummy);
+        clocks = 4;
+        break;
+    case 0x1D: // ABSX -- 3 bytes, 4 (+1) cycles
+        extra_clock = mode_absx(&val, &dummy);
+        clocks = 4 + extra_clock;
+        break;
+    case 0x19: // ABSY -- 3 bytes, 4 (+1) cycles
+        extra_clock = mode_absy(&val, &dummy);
+        clocks = 4 + extra_clock;
+        break;
+    case 0x01: // INDX -- 2 bytes, 6 cycles
+        mode_indx(&val, &dummy);
+        clocks = 6;
+        break;
+    case 0x11: // INDY -- 2 bytes, 5 (+1) cycles
+        extra_clock = mode_indy(&val, &dummy);
+        clocks = 5 + extra_clock;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // OR
+    state.acc |= val;
+
+    // set flags
+    set_flag(PSR_Z, state.acc == 0);
+    set_flag(PSR_N, state.acc & 0x80);
+
+    return clocks;
 }
 
+/*
+ * PHA - Push Accumulator
+ * Size: 1
+ * Cycles: 3
+ * Flags: None
+ */
 static int pha()
 {
-    return 0;
+    assert(state.op == 0x48);
+    mode_imp();
+    cpu_write(state.acc, SP);
+    state.sp--;
+    return 3;
 }
 
+/*
+ * PHP - Push Processor Status
+ * Size: 1
+ * Cycles: 3
+ * Flags: None
+ */
 static int php()
 {
-    return 0;
+    assert(state.op == 0x08);
+    mode_imp();
+    u8 stack_psr = state.psr | PSR_B0 | PSR_B1;
+    cpu_write(stack_psr, SP);
+    state.sp--;
+    return 3;
 }
 
+/*
+ * PLA - Pull Accumulator
+ * Size: 1
+ * Cycles: 4
+ * Flags: Z, N
+ */
 static int pla()
 {
-    return 0;
+    assert(state.op == 0x68);
+    mode_imp();
+    state.sp++;
+    state.acc = cpu_read(SP);
+    // set flags
+    set_flag(PSR_Z, state.acc == 0);
+    set_flag(PSR_N, state.acc & 0x80);
+    return 4;
 }
 
+/*
+ * PLP - Pull Proccessor Status
+ * Size: 1
+ * Cycles: 4
+ * Flags: Set from stack
+ */
 static int plp()
 {
-    return 0;
+    assert(state.op == 0x28);
+    mode_imp();
+    state.sp++;
+    state.psr = cpu_read(SP);
+    // remove fake B flags
+    set_flag(PSR_B0, false);
+    set_flag(PSR_B1, false);
+    return 4;
 }
 
+/*
+ * ROL - Rotate Left
+ * Size: 1-3
+ * Cycles: 7
+ * Flags: C, Z, N
+ */
 static int rol()
 {
-    return 0;
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    bool inmem = true;
+    switch (state.op) {
+    case 0x2A: // ACC -- 1 byte, 2 cycles
+        mode_acc(&val);
+        clocks = 2;
+        inmem = false;
+        break;
+    case 0x26: // ZP -- 2 bytes, 5 cycles
+        mode_zp(&val, &from);
+        clocks = 5;
+        break;
+    case 0x36: // ZPX -- 2 bytes, 6 cycles
+        mode_zpx(&val, &from);
+        clocks = 6;
+        break;
+    case 0x2E: // ABS -- 3 bytes, 6 cycles
+        mode_abs(&val, &from);
+        clocks = 6;
+        break;
+    case 0x3E: // ABSX -- 3 bytes, 7 cycles
+        mode_absx(&val, &from);
+        clocks = 7;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // rotate
+    u16 res = (val << 1) | (state.psr & PSR_C);
+    if (inmem) {
+        cpu_write(res & 0xFF, from);
+    } else {
+        state.acc = res & 0xFF;
+    }
+
+    // set flags
+    set_flag(PSR_C, val & 0x80);
+    set_flag(PSR_Z, (res & 0xFF) == 0);
+    set_flag(PSR_N, res & 0x80);
+
+    return clocks;
 }
 
+/*
+ * ROR - Rotate Right
+ * Size: 1-3
+ * Cycles: 2-7
+ * Flags: C, Z, N
+ */
 static int ror()
 {
-    return 0;
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    bool inmem = true;
+    switch (state.op) {
+    case 0x6A: // ACC -- 1 byte, 2 cycles
+        mode_acc(&val);
+        clocks = 2;
+        inmem = false;
+        break;
+    case 0x66: // ZP -- 2 bytes, 5 cycles
+        mode_zp(&val, &from);
+        clocks = 5;
+        break;
+    case 0x76: // ZPX -- 2 bytes, 6 cycles
+        mode_zpx(&val, &from);
+        clocks = 6;
+        break;
+    case 0x6E: // ABS -- 3 bytes, 6 cycles
+        mode_abs(&val, &from);
+        clocks = 6;
+        break;
+    case 0x7E: // ABSX -- 3 bytes, 7 cycles
+        mode_absx(&val, &from);
+        clocks = 7;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // rotate
+    u8 res = (val >> 1) | ((state.psr & PSR_C) << 7);
+    if (inmem) {
+        cpu_write(res, from);
+    } else {
+        state.acc = res;
+    }
+
+    // set flags
+    set_flag(PSR_C, val & 0x01);
+    set_flag(PSR_Z, res == 0);
+    set_flag(PSR_N, res & 0x80);
+    
+    return clocks;
 }
 
+/*
+ * RTI - Return from Interrupt
+ * Size: 1
+ * Cycles: 6
+ * Flags: Set from stack
+ */
 static int rti()
 {
-    return 0;
+    assert(state.op == 0x40);
+    mode_imp();
+    // pull psr and remove fake B flags
+    state.sp++;
+    state.psr = cpu_read(SP);
+    set_flag(PSR_B0, false);
+    set_flag(PSR_B1, false);
+    // pull pc
+    state.sp++;
+    u16 lo = cpu_read(SP);
+    state.sp++;
+    u16 hi = cpu_read(SP);
+    state.pc = (hi << 8) | lo;
+    return 6;
 }
 
+/*
+ * RTS - Return from Subroutine
+ * Size: 1
+ * Cycles: 6
+ * Flags: None
+ */
 static int rts()
 {
-    return 0;
+    assert(state.op == 0x60);
+    mode_imp();
+    // pull (pc-1)
+    state.sp++;
+    u16 lo = cpu_read(SP);
+    state.sp++;
+    u16 hi = cpu_read(SP);
+    state.pc = (hi << 8) | lo;
+    state.pc++;
+    return 6;
 }
 
+/*
+ * SBC - Subtract with Carry
+ * Size: 2-3
+ * Cycles: 2-6
+ * Flags: C, Z, V, N
+ */
 static int sbc()
 {
-    return 0;
+    int clocks = 0;
+    u8 val;
+    u16 dummy;
+    int extra_clock;
+    switch (state.op) {
+    case 0xE9: // IMM -- 2 bytes, 2 cycles
+        mode_imm(&val);
+        clocks = 2;
+        break;
+    case 0xE5: // ZP -- 2 bytes, 3 cycles
+        mode_zp(&val, &dummy);
+        clocks = 3;
+        break;
+    case 0xF5: // ZPX -- 2 bytes, 4 cycles
+        mode_zpx(&val, &dummy);
+        clocks = 4;
+        break;
+    case 0xED: // ABS -- 3 bytes, 4 cycles
+        mode_abs(&val, &dummy);
+        clocks = 4;
+        break;
+    case 0xFD: // ABSX -- 3 bytes, 4 (+1) cycles
+        extra_clock = mode_absx(&val, &dummy);
+        clocks = 4 + extra_clock;
+        break;
+    case 0xF9: // ABSY -- 3 bytes, 4 (+1) cycles
+        extra_clock = mode_absy(&val, &dummy);
+        clocks = 4 + extra_clock;
+        break;
+    case 0xE1: // INDX -- 2 bytes, 6 cycles
+        mode_indx(&val, &dummy);
+        clocks = 6;
+        break;
+    case 0xF1: // INDY -- 2 bytes, 5 (+1) cycles
+        extra_clock = mode_indy(&val, &dummy);
+        clocks = 5 + extra_clock;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // subtract using 2's complement adding with carry
+    u8 neg_val = ~val + 1;
+    u8 neg_carry = !(state.psr & PSR_C);
+    u16 res = (u16)state.acc + (u16)neg_val + (u16)neg_carry;
+    state.acc = res & 0xFF;
+
+    // set the flags
+    set_flag(PSR_C, res & 0x100);
+    set_flag(PSR_Z, state.acc == 0);
+    set_flag(PSR_V, ~(neg_val ^ prev_state.acc) & (neg_val & state.acc) & 0x80);
+    set_flag(PSR_N, state.acc & 0x80);
+
+    return clocks;
 }
 
+/*
+ * SEC - Set Carry Flag
+ * Size: 1
+ * Cycles: 2
+ * Flags: C
+ */
 static int sec()
 {
-    return 0;
+    assert(state.op == 0x38);
+    mode_imp();
+    set_flag(PSR_C, false);
+    return 2;
 }
 
+/*
+ * SED - Set Decimal Flag
+ * Size: 1
+ * Cycles: 2
+ * Flags: D
+ */
 static int sed()
 {
-    return 0;
+    assert(state.op == 0xF8);
+    mode_imp();
+    set_flag(PSR_D, false);
+    return 2;
 }
 
+/*
+ * SEI - Set Interrupt Disable Flag
+ * Size: 1
+ * Cycles: 2
+ * Flags: I
+ */
 static int sei()
 {
-    return 0;
+    assert(state.op == 0x78);
+    mode_imp();
+    set_flag(PSR_I, false);
+    return 2;
 }
 
+/*
+ * STA - Store Accumulator
+ * Size: 2-3
+ * Cycles: 3-6
+ * Flags: None
+ */
 static int sta()
 {
-    return 0;
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    switch (state.op) {
+    case 0x85: // ZP -- 2 bytes, 3 cycles
+        mode_zp(&val, &from);
+        clocks = 3;
+        break;
+    case 0x95: // ZPX -- 2 bytes, 4 cycles
+        mode_zpx(&val, &from);
+        clocks = 4;
+        break;
+    case 0x8D: // ABS -- 3 bytes, 4 cycles
+        mode_abs(&val, &from);
+        clocks = 4;
+        break;
+    case 0x9D: // ABSX -- 3 bytes, 5 cycles
+        mode_absx(&val, &from);
+        clocks = 5;
+        break;
+    case 0x99: // ABSY -- 3 bytes, 5 cycles
+        mode_absy(&val, &from);
+        clocks = 5;
+        break;
+    case 0x81: // INDX -- 2 bytes, 6 cycles
+        mode_indx(&val, &from);
+        clocks = 6;
+        break;
+    case 0x91: // INDY -- 2 bytes, 6 cycles
+        mode_indy(&val, &from);
+        clocks = 6;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // store acc
+    cpu_write(state.acc, from);
+    return clocks;
 }
 
+/*
+ * STX - Store X Register
+ * Size: 2-3
+ * Cycles: 3-4
+ * Flags: None
+ */
 static int stx()
 {
-    return 0;
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    switch (state.op) {
+    case 0x86: // ZP -- 2 bytes, 3 cycles
+        mode_zp(&val, &from);
+        clocks = 3;
+        break;
+    case 0x96: // ZPY -- 2 bytes, 4 cycles
+        mode_zpy(&val, &from);
+        clocks = 4;
+        break;
+    case 0x8E: // ABS -- 3 bytes, 4 cycles
+        mode_abs(&val, &from);
+        clocks = 4;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+    // store x
+    cpu_write(state.x, from);
+    return clocks;
 }
 
+/*
+ * STY - Store Y Register
+ * Size: 2-3
+ * Cycles: 3-4
+ * Flags: None
+ */
 static int sty()
 {
-    return 0;
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    switch (state.op) {
+    case 0x84: // ZP -- 2 bytes, 3 cycles
+        mode_zp(&val, &from);
+        clocks = 3;
+        break;
+    case 0x94: // ZPX -- 2 bytes, 4 cycles
+        mode_zpx(&val, &from);
+        clocks = 4;
+        break;
+    case 0x8C: // ABS -- 3 bytes, 4 cycles
+        mode_abs(&val, &from);
+        clocks = 4;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+    // store x
+    cpu_write(state.y, from);
+    return clocks;
 }
 
+/*
+ * TAX - Transfer Accumulator to X
+ * Size: 1
+ * Cycles: 2
+ * Flags: Z, N
+ */
 static int tax()
 {
-    return 0;
+    assert(state.op == 0xAA);
+    mode_imp();
+    state.x = state.acc;
+    // set flags
+    set_flag(PSR_Z, state.x == 0);
+    set_flag(PSR_N, state.x & 0x80);
+    return 2;
 }
 
+/*
+ * TAY - Transfer Accumulator to Y
+ * Size: 1
+ * Cycles: 2
+ * Flags: Z, N
+ */
 static int tay()
 {
-    return 0;
+    assert(state.op == 0xAB);
+    mode_imp();
+    state.y = state.acc;
+    // set flags
+    set_flag(PSR_Z, state.y == 0);
+    set_flag(PSR_N, state.y & 0x80);
+    return 2;
 }
 
+/*
+ * TSX - Transfer Stack Pointer to X
+ * Size: 1
+ * Cycles: 2
+ * Flags: Z, N
+ */
 static int tsx()
 {
-    return 0;
+    assert(state.op == 0xBA);
+    mode_imp();
+    state.x = state.sp;
+    // set flags
+    set_flag(PSR_Z, state.x == 0);
+    set_flag(PSR_N, state.x & 0x80);
+    return 2;
 }
 
+/*
+ * TXA - Transfer X to Accumulator
+ * Size: 1
+ * Cycles: 2
+ * Flags: Z, N
+ */
 static int txa()
 {
-    return 0;
+    assert(state.op == 0x8A);
+    mode_imp();
+    state.acc = state.x;
+    // set flags
+    set_flag(PSR_Z, state.acc == 0);
+    set_flag(PSR_N, state.acc & 0x80);
+    return 2;
 }
 
+/*
+ * TXS - Transfer X to Stack Pointer
+ * Size: 1
+ * Cycles: 2
+ * Flags: None
+ */
 static int txs()
 {
-    return 0;
+    assert(state.op == 0x9A);
+    mode_imp();
+    state.sp = state.x;
+    return 2;
 }
 
+/*
+ * TYA - Transfer Y to Accumulator
+ * Size: 1
+ * Cycles: 2
+ * Flags: Z, N
+ */
 static int tya()
 {
-    return 0;
+    assert(state.op == 0x98);
+    mode_imp();
+    state.acc = state.y;
+    // set flags
+    set_flag(PSR_Z, state.acc == 0);
+    set_flag(PSR_N, state.acc & 0x80);
+    return 2;
 }
 
