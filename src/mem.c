@@ -12,9 +12,10 @@
 
 #include <utils.h>
 #include <cart.h>
+#include <ppu.h>
 
 // Memory map for the cpu address space
-typedef enum {
+enum cpu_memmap {
     // CPU internal ram (mirrored)
     MC_IRAM_START = 0x0000,
     MC_IRAM_END   = 0x1FFF,
@@ -39,12 +40,12 @@ typedef enum {
     MC_CART_START = 0x4020,
     MC_CART_END   = 0xFFFF,
     MC_CART_SIZE  = (MC_CART_END - MC_CART_START + 1)
-} cpu_memmap_t;
+};
 static u8 iram[MC_IRAM_SIZE] = {0};
 static u8 cartmem[MC_CART_SIZE] = {0};
 
 // Memory map for the ppu address space
-typedef enum {
+enum ppu_memmap {
     // Pattern table found on CHR-ROM from cartridge
     MP_PT_START = 0x0000,
     MP_PT_END   = 0x1FFF,
@@ -64,7 +65,7 @@ typedef enum {
     MP_PAL_START = 0x3F00,
     MP_PAL_END   = 0x3FFF,
     MP_PAL_SIZE  = 256
-} ppu_memmap_t;
+};
 static u8 chrrom[MP_PT_SIZE] = {0};
 static u8 vram[MP_NT_SIZE] = {0};
 static u8 palmem[MP_PAL_SIZE] = {0};
@@ -81,9 +82,8 @@ u8 cpu_read(u16 addr)
         // convert to 0-7 addr space
         addr = addr - MC_PPU_START;
         addr = addr % 8;
-        // return ppu_reg_read(addr);
-        return 0;
-    }
+        return ppu_reg_read(addr);
+   }
 
     // apu/io reads
     if (addr >= MC_APU_IO_START && addr <= MC_APU_IO_END) {
@@ -125,7 +125,7 @@ void cpu_write(u8 data, u16 addr)
         // convert to 0-7 addr space
         addr = addr - MC_PPU_START;
         addr = addr % 8;
-        // ppu_reg_write(data, addr);
+        ppu_reg_write(data, addr);
         return;
     }
 

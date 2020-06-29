@@ -38,6 +38,17 @@ static void exit_handler(int rc)
     }
 }
 
+static void run()
+{
+    int limit = 6000;
+    int rounds = 0;
+    // int cycles;
+    while (rounds < limit) {
+        cpu_step();
+        rounds++;
+    }
+}
+
 int main(int argc, char **argv)
 {
     (void) argc, (void) argv;
@@ -66,11 +77,13 @@ int main(int argc, char **argv)
     neslog_add(LID_CPU, "cpu.log");
 
     // init hw
+    cart_load(rompath);
     cpu_init();
 
     // TODO do the nes stuff here
-    cart_load(rompath);
+    run()    ;
 
     neslog_cleanup();
     return 0;
 }
+

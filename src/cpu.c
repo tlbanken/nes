@@ -349,7 +349,7 @@ int cpu_step()
     // high 4 bits = MSD
     u8 opcode = cpu_read(state.pc++);
     state.op = opcode;
-    LOG("%02X ", state.op);
+    LOG(" %02X", state.op);
     int op_index = ((opcode >> 4) & 0xF) * 16 + (opcode & 0xF); 
     // execute instruction
     int clocks = opmatrix[op_index]();
@@ -416,7 +416,7 @@ static int mode_imm(u8 *fetch)
 {
     *fetch = cpu_read(state.pc++);
     LOG(" %02X   ", *fetch);
-    LOG(" %s #$%02X                         ", op_to_str(state.op), *fetch);
+    LOG(" %s #$%02X                           ", op_to_str(state.op), *fetch);
     return 0;
 }
 
@@ -429,7 +429,7 @@ static int mode_abs(u8 *fetch, u16 *from)
 
     *fetch = cpu_read(addr);
     *from = addr;
-    LOG(" %s $%04X = %02X                   ", addr, *fetch);
+    LOG(" %s $%04X = %02X                     ", op_to_str(state.op), addr, *fetch);
     return 0;
 }
 
@@ -440,7 +440,7 @@ static int mode_zp(u8 *fetch, u16 *from)
 
     *fetch = cpu_read(zaddr);
     *from = zaddr;
-    LOG(" %s $%02X = %02X                   ", zaddr, *fetch);
+    LOG(" %s $%02X = %02X                       ", op_to_str(state.op), zaddr, *fetch);
     return 0;
 }
 
@@ -451,7 +451,7 @@ static int mode_zpx(u8 *fetch, u16 *from)
 
     *from = (zaddr + state.x) & 0xFF;
     *fetch = cpu_read(*from);
-    LOG(" %s $%02X,X @ %02X = %02X          ", op_to_str(state.op), zaddr, *from, *fetch);
+    LOG(" %s $%02X,X @ %02X = %02X                ", op_to_str(state.op), zaddr, *from, *fetch);
     return 0;
 }
 
@@ -462,7 +462,7 @@ static int mode_zpy(u8 *fetch, u16 *from)
 
     *from = (zaddr + state.y) & 0xFF;
     *fetch = cpu_read(*from);
-    LOG(" %s $%02X,Y @ %02X = %02X          ", op_to_str(state.op), zaddr, *from, *fetch);
+    LOG(" %s $%02X,Y @ %02X = %02X              ", op_to_str(state.op), zaddr, *from, *fetch);
     return 0;
 }
 
@@ -471,11 +471,11 @@ static int mode_absx(u8 *fetch, u16 *from)
     u16 lo = cpu_read(state.pc++);
     u16 hi = cpu_read(state.pc++);
     u16 addr = (hi << 8) | lo;
-    LOG(" %02X %02X");
+    LOG(" %02X %02X", lo, hi);
 
     *from = (addr + state.x);
     *fetch = cpu_read(*from);
-    LOG(" %s $%04X,X @ %04X = %02X          ", op_to_str(state.op), addr, *from, *fetch);
+    LOG(" %s $%04X,X @ %04X = %02X                ", op_to_str(state.op), addr, *from, *fetch);
     // check if extra cycle needed (from page cross)
     return (u16)state.x + lo > 0xFF ? 1 : 0;
 }
@@ -485,11 +485,11 @@ static int mode_absy(u8 *fetch, u16 *from)
     u16 lo = cpu_read(state.pc++);
     u16 hi = cpu_read(state.pc++);
     u16 addr = (hi << 8) | lo;
-    LOG(" %02X %02X");
+    LOG(" %02X %02X", lo, hi);
 
     *from = (addr + state.y);
     *fetch = cpu_read(*from);
-    LOG(" %s $%04X,Y @ %04X = %02X          ", op_to_str(state.op), addr, *from, *fetch);
+    LOG(" %s $%04X,Y @ %04X = %02X            ", op_to_str(state.op), addr, *from, *fetch);
     // check if extra cycle needed (from page cross)
     return (u16)state.y + lo > 0xFF ? 1 : 0;
 }
@@ -512,7 +512,7 @@ static int mode_rel(u16 *fetch)
     rel = rel & 0x80 ? ~rel : rel;
 
     *fetch = rel + state.pc + carry;
-    LOG(" %s $%04X                          ", *fetch);
+    LOG(" %s $%04X                          ", op_to_str(state.op), *fetch);
     // check if page boundary crossed (bit 8 should be same if no cross)
     return (*fetch ^ state.pc) & 0x0100 ? 1 : 0;
 }
@@ -529,7 +529,7 @@ static int mode_indx(u8 *fetch, u16 *from)
 
     *fetch = cpu_read(addr);
     *from = addr;
-    LOG(" %s ($%02X,X) @ %02X = %04X = %02X ", op_to_str(state.op), a, ind_addr,
+    LOG(" %s ($%02X,X) @ %02X = %04X = %02X       ", op_to_str(state.op), a, ind_addr,
         addr, *fetch);
 
     return 0;
@@ -548,7 +548,7 @@ static int mode_indy(u8 *fetch, u16 *from)
 
     *fetch = cpu_read(yaddr);
     *from = yaddr;
-    LOG(" %s (%02X,Y) = %04X @ %04X = %02X  ", op_to_str(state.op), ind_addr, addr,
+    LOG(" %s (%02X,Y) = %04X @ %04X = %02X      ", op_to_str(state.op), ind_addr, addr,
         yaddr, *fetch);
 
     return (yaddr ^ addr) & 0x0100 ? 1 : 0;
@@ -642,7 +642,7 @@ static int adc()
     // set the flags
     set_flag(PSR_C, res & 0x100);
     set_flag(PSR_Z, state.acc == 0);
-    set_flag(PSR_V, ~(val ^ prev_state.acc) & (val & state.acc) & 0x80);
+    set_flag(PSR_V, ~(val ^ prev_state.acc) & (val ^ res) & 0x80);
     set_flag(PSR_N, state.acc & 0x80);
 
     return clocks;
@@ -758,7 +758,7 @@ static int asl()
 
     // set flags
     set_flag(PSR_C, val & 0x80);
-    set_flag(PSR_Z, res == 0);
+    set_flag(PSR_Z, (res & 0xFF) == 0);
     set_flag(PSR_N, res & 0x80);
 
     return clocks;
@@ -837,9 +837,9 @@ static int bit()
         mode_zp(&val, &from);
         clocks = 3;
         break;
-    case 0x2C: // ABS -- bytes 2, cycles 3
+    case 0x2C: // ABS -- bytes 3, cycles 4
         mode_abs(&val, &from);
-        clocks = 3;
+        clocks = 4;
         break;
     default:
         ERROR("Unknown opcode (%02X)\n", state.op);
@@ -1581,16 +1581,16 @@ static int ldy()
         mode_zp(&val, &from);
         clocks = 3;
         break;
-    case 0xB4: // ZPY - 2 bytes, 4 cycles
-        mode_zpy(&val, &from);
+    case 0xB4: // ZPX - 2 bytes, 4 cycles
+        mode_zpx(&val, &from);
         clocks = 4;
         break;
     case 0xAC: // ABS - 3 bytes, 4 cycles
         mode_abs(&val, &from);
         clocks = 4;
         break;
-    case 0xBC: // ABSY - 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absy(&val, &from);
+    case 0xBC: // ABSX - 3 bytes, 4 (+1) cycles
+        extra_clock = mode_absx(&val, &from);
         clocks = 4 + extra_clock;
         break;
     default:
@@ -1798,9 +1798,9 @@ static int plp()
     mode_imp();
     state.sp++;
     state.psr = cpu_read(SP);
-    // remove fake B flags
+    // reset fake B flags
     set_flag(PSR_B0, false);
-    set_flag(PSR_B1, false);
+    set_flag(PSR_B1, true);
     return 4;
 }
 
@@ -1928,7 +1928,7 @@ static int rti()
     state.sp++;
     state.psr = cpu_read(SP);
     set_flag(PSR_B0, false);
-    set_flag(PSR_B1, false);
+    set_flag(PSR_B1, true);
     // pull pc
     state.sp++;
     u16 lo = cpu_read(SP);
@@ -2009,15 +2009,15 @@ static int sbc()
     }
 
     // subtract using 2's complement adding with carry
-    u8 neg_val = ~val + 1;
-    u8 neg_carry = !(state.psr & PSR_C);
+    u8 neg_val = ~val;
+    u8 neg_carry = (state.psr & PSR_C);
     u16 res = (u16)state.acc + (u16)neg_val + (u16)neg_carry;
     state.acc = res & 0xFF;
 
     // set the flags
     set_flag(PSR_C, res & 0x100);
     set_flag(PSR_Z, state.acc == 0);
-    set_flag(PSR_V, ~(neg_val ^ prev_state.acc) & (neg_val & state.acc) & 0x80);
+    set_flag(PSR_V, (res ^ prev_state.acc) & (neg_val ^ res) & 0x80);
     set_flag(PSR_N, state.acc & 0x80);
 
     return clocks;
@@ -2033,7 +2033,7 @@ static int sec()
 {
     assert(state.op == 0x38);
     mode_imp();
-    set_flag(PSR_C, false);
+    set_flag(PSR_C, true);
     return 2;
 }
 
@@ -2047,7 +2047,7 @@ static int sed()
 {
     assert(state.op == 0xF8);
     mode_imp();
-    set_flag(PSR_D, false);
+    set_flag(PSR_D, true);
     return 2;
 }
 
@@ -2061,7 +2061,7 @@ static int sei()
 {
     assert(state.op == 0x78);
     mode_imp();
-    set_flag(PSR_I, false);
+    set_flag(PSR_I, true);
     return 2;
 }
 
@@ -2206,7 +2206,7 @@ static int tax()
  */
 static int tay()
 {
-    assert(state.op == 0xAB);
+    assert(state.op == 0xA8);
     mode_imp();
     state.y = state.acc;
     // set flags
