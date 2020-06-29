@@ -71,7 +71,7 @@ void cpu_init()
     opmatrix[0x0*16+0x1] = ora;
     opmatrix[0x0*16+0x2] = undef;
     opmatrix[0x0*16+0x3] = undef;
-    opmatrix[0x0*16+0x4] = undef;
+    opmatrix[0x0*16+0x4] = nop; // unofficial
     opmatrix[0x0*16+0x5] = ora;
     opmatrix[0x0*16+0x6] = asl;
     opmatrix[0x0*16+0x7] = undef;
@@ -79,7 +79,7 @@ void cpu_init()
     opmatrix[0x0*16+0x9] = ora;
     opmatrix[0x0*16+0xA] = asl;
     opmatrix[0x0*16+0xB] = undef;
-    opmatrix[0x0*16+0xC] = undef;
+    opmatrix[0x0*16+0xC] = nop; // unofficial
     opmatrix[0x0*16+0xD] = ora;
     opmatrix[0x0*16+0xE] = asl;
     opmatrix[0x0*16+0xF] = undef;
@@ -88,15 +88,15 @@ void cpu_init()
     opmatrix[0x1*16+0x1] = ora;
     opmatrix[0x1*16+0x2] = undef;
     opmatrix[0x1*16+0x3] = undef;
-    opmatrix[0x1*16+0x4] = undef;
+    opmatrix[0x1*16+0x4] = nop; // unofficial
     opmatrix[0x1*16+0x5] = ora;
     opmatrix[0x1*16+0x6] = asl;
     opmatrix[0x1*16+0x7] = undef;
     opmatrix[0x1*16+0x8] = clc;
     opmatrix[0x1*16+0x9] = ora;
-    opmatrix[0x1*16+0xA] = undef;
+    opmatrix[0x1*16+0xA] = nop; // unofficial
     opmatrix[0x1*16+0xB] = undef;
-    opmatrix[0x1*16+0xC] = undef;
+    opmatrix[0x1*16+0xC] = nop; // unofficial
     opmatrix[0x1*16+0xD] = ora;
     opmatrix[0x1*16+0xE] = asl;
     opmatrix[0x1*16+0xF] = undef;
@@ -122,15 +122,15 @@ void cpu_init()
     opmatrix[0x3*16+0x1] = and;
     opmatrix[0x3*16+0x2] = undef;
     opmatrix[0x3*16+0x3] = undef;
-    opmatrix[0x3*16+0x4] = undef;
+    opmatrix[0x3*16+0x4] = nop; // unofficial
     opmatrix[0x3*16+0x5] = and;
     opmatrix[0x3*16+0x6] = rol;
     opmatrix[0x3*16+0x7] = undef;
     opmatrix[0x3*16+0x8] = sec;
     opmatrix[0x3*16+0x9] = and;
-    opmatrix[0x3*16+0xA] = undef;
+    opmatrix[0x3*16+0xA] = nop; // unofficial
     opmatrix[0x3*16+0xB] = undef;
-    opmatrix[0x3*16+0xC] = undef;
+    opmatrix[0x3*16+0xC] = nop; // unofficial
     opmatrix[0x3*16+0xD] = and;
     opmatrix[0x3*16+0xE] = rol;
     opmatrix[0x3*16+0xF] = undef;
@@ -139,7 +139,7 @@ void cpu_init()
     opmatrix[0x4*16+0x1] = eor;
     opmatrix[0x4*16+0x2] = undef;
     opmatrix[0x4*16+0x3] = undef;
-    opmatrix[0x4*16+0x4] = undef;
+    opmatrix[0x4*16+0x4] = nop; // unofficial
     opmatrix[0x4*16+0x5] = eor;
     opmatrix[0x4*16+0x6] = lsr;
     opmatrix[0x4*16+0x7] = undef;
@@ -156,15 +156,15 @@ void cpu_init()
     opmatrix[0x5*16+0x1] = eor;
     opmatrix[0x5*16+0x2] = undef;
     opmatrix[0x5*16+0x3] = undef;
-    opmatrix[0x5*16+0x4] = undef;
+    opmatrix[0x5*16+0x4] = nop; // unofficial
     opmatrix[0x5*16+0x5] = eor;
     opmatrix[0x5*16+0x6] = lsr;
     opmatrix[0x5*16+0x7] = undef;
     opmatrix[0x5*16+0x8] = cli;
     opmatrix[0x5*16+0x9] = eor;
-    opmatrix[0x5*16+0xA] = undef;
+    opmatrix[0x5*16+0xA] = nop; // unofficial
     opmatrix[0x5*16+0xB] = undef;
-    opmatrix[0x5*16+0xC] = undef;
+    opmatrix[0x5*16+0xC] = nop; // unofficial
     opmatrix[0x5*16+0xD] = eor;
     opmatrix[0x5*16+0xE] = lsr;
     opmatrix[0x5*16+0xF] = undef;
@@ -173,7 +173,7 @@ void cpu_init()
     opmatrix[0x6*16+0x1] = adc;
     opmatrix[0x6*16+0x2] = undef;
     opmatrix[0x6*16+0x3] = undef;
-    opmatrix[0x6*16+0x4] = undef;
+    opmatrix[0x6*16+0x4] = nop; // unofficial
     opmatrix[0x6*16+0x5] = adc;
     opmatrix[0x6*16+0x6] = ror;
     opmatrix[0x6*16+0x7] = undef;
@@ -190,29 +190,29 @@ void cpu_init()
     opmatrix[0x7*16+0x1] = adc;
     opmatrix[0x7*16+0x2] = undef;
     opmatrix[0x7*16+0x3] = undef;
-    opmatrix[0x7*16+0x4] = undef;
+    opmatrix[0x7*16+0x4] = nop; // unofficial
     opmatrix[0x7*16+0x5] = adc;
     opmatrix[0x7*16+0x6] = ror;
     opmatrix[0x7*16+0x7] = undef;
     opmatrix[0x7*16+0x8] = sei;
     opmatrix[0x7*16+0x9] = adc;
-    opmatrix[0x7*16+0xA] = undef;
+    opmatrix[0x7*16+0xA] = nop; // unofficial
     opmatrix[0x7*16+0xB] = undef;
-    opmatrix[0x7*16+0xC] = undef;
+    opmatrix[0x7*16+0xC] = nop; // unofficial
     opmatrix[0x7*16+0xD] = adc;
     opmatrix[0x7*16+0xE] = ror;
     opmatrix[0x7*16+0xF] = undef;
     // MSD 8
-    opmatrix[0x8*16+0x0] = undef;
+    opmatrix[0x8*16+0x0] = nop; // unofficial
     opmatrix[0x8*16+0x1] = sta;
-    opmatrix[0x8*16+0x2] = undef;
+    opmatrix[0x8*16+0x2] = nop; // unofficial
     opmatrix[0x8*16+0x3] = undef;
     opmatrix[0x8*16+0x4] = sty;
     opmatrix[0x8*16+0x5] = sta;
     opmatrix[0x8*16+0x6] = stx;
     opmatrix[0x8*16+0x7] = undef;
     opmatrix[0x8*16+0x8] = dey;
-    opmatrix[0x8*16+0x9] = undef;
+    opmatrix[0x8*16+0x9] = nop; // unofficial
     opmatrix[0x8*16+0xA] = txa;
     opmatrix[0x8*16+0xB] = undef;
     opmatrix[0x8*16+0xC] = sty;
@@ -273,7 +273,7 @@ void cpu_init()
     // MSD 12
     opmatrix[0xC*16+0x0] = cpy;
     opmatrix[0xC*16+0x1] = cmp;
-    opmatrix[0xC*16+0x2] = undef;
+    opmatrix[0xC*16+0x2] = nop; // unofficial
     opmatrix[0xC*16+0x3] = undef;
     opmatrix[0xC*16+0x4] = cpy;
     opmatrix[0xC*16+0x5] = cmp;
@@ -292,22 +292,22 @@ void cpu_init()
     opmatrix[0xD*16+0x1] = cmp;
     opmatrix[0xD*16+0x2] = undef;
     opmatrix[0xD*16+0x3] = undef;
-    opmatrix[0xD*16+0x4] = undef;
+    opmatrix[0xD*16+0x4] = nop; // unofficial
     opmatrix[0xD*16+0x5] = cmp;
     opmatrix[0xD*16+0x6] = dec;
     opmatrix[0xD*16+0x7] = undef;
     opmatrix[0xD*16+0x8] = cld;
     opmatrix[0xD*16+0x9] = cmp;
-    opmatrix[0xD*16+0xA] = undef;
+    opmatrix[0xD*16+0xA] = nop; // unofficial
     opmatrix[0xD*16+0xB] = undef;
-    opmatrix[0xD*16+0xC] = undef;
+    opmatrix[0xD*16+0xC] = nop; // unofficial
     opmatrix[0xD*16+0xD] = cmp;
     opmatrix[0xD*16+0xE] = dec;
     opmatrix[0xD*16+0xF] = undef;
     // MSD 14
     opmatrix[0xE*16+0x0] = cpx;
     opmatrix[0xE*16+0x1] = sbc;
-    opmatrix[0xE*16+0x2] = undef;
+    opmatrix[0xE*16+0x2] = nop; // unofficial
     opmatrix[0xE*16+0x3] = undef;
     opmatrix[0xE*16+0x4] = cpx;
     opmatrix[0xE*16+0x5] = sbc;
@@ -326,15 +326,15 @@ void cpu_init()
     opmatrix[0xF*16+0x1] = sbc;
     opmatrix[0xF*16+0x2] = undef;
     opmatrix[0xF*16+0x3] = undef;
-    opmatrix[0xF*16+0x4] = undef;
+    opmatrix[0xF*16+0x4] = nop; // unofficial
     opmatrix[0xF*16+0x5] = sbc;
     opmatrix[0xF*16+0x6] = inc;
     opmatrix[0xF*16+0x7] = undef;
     opmatrix[0xF*16+0x8] = sed;
     opmatrix[0xF*16+0x9] = sbc;
-    opmatrix[0xF*16+0xA] = undef;
+    opmatrix[0xF*16+0xA] = nop; // unofficial
     opmatrix[0xF*16+0xB] = undef;
-    opmatrix[0xF*16+0xC] = undef;
+    opmatrix[0xF*16+0xC] = nop; // unofficial
     opmatrix[0xF*16+0xD] = sbc;
     opmatrix[0xF*16+0xE] = inc;
     opmatrix[0xF*16+0xF] = undef;
@@ -407,7 +407,7 @@ static void set_flag(enum psr_flags flag, bool cond)
 static int mode_acc(u8 *fetch)
 {
     LOG("      ");
-    LOG(" %s A                              ", op_to_str(state.op));
+    LOG(" %4s A                              ", op_to_str(state.op));
     *fetch = state.acc;
     return 0;
 }
@@ -416,7 +416,7 @@ static int mode_imm(u8 *fetch)
 {
     *fetch = cpu_read(state.pc++);
     LOG(" %02X   ", *fetch);
-    LOG(" %s #$%02X                           ", op_to_str(state.op), *fetch);
+    LOG(" %4s #$%02X                           ", op_to_str(state.op), *fetch);
     return 0;
 }
 
@@ -429,7 +429,7 @@ static int mode_abs(u8 *fetch, u16 *from)
 
     *fetch = cpu_read(addr);
     *from = addr;
-    LOG(" %s $%04X = %02X                     ", op_to_str(state.op), addr, *fetch);
+    LOG(" %4s $%04X = %02X                     ", op_to_str(state.op), addr, *fetch);
     return 0;
 }
 
@@ -440,7 +440,7 @@ static int mode_zp(u8 *fetch, u16 *from)
 
     *fetch = cpu_read(zaddr);
     *from = zaddr;
-    LOG(" %s $%02X = %02X                       ", op_to_str(state.op), zaddr, *fetch);
+    LOG(" %4s $%02X = %02X                       ", op_to_str(state.op), zaddr, *fetch);
     return 0;
 }
 
@@ -451,7 +451,7 @@ static int mode_zpx(u8 *fetch, u16 *from)
 
     *from = (zaddr + state.x) & 0xFF;
     *fetch = cpu_read(*from);
-    LOG(" %s $%02X,X @ %02X = %02X                ", op_to_str(state.op), zaddr, *from, *fetch);
+    LOG(" %4s $%02X,X @ %02X = %02X                ", op_to_str(state.op), zaddr, *from, *fetch);
     return 0;
 }
 
@@ -462,7 +462,7 @@ static int mode_zpy(u8 *fetch, u16 *from)
 
     *from = (zaddr + state.y) & 0xFF;
     *fetch = cpu_read(*from);
-    LOG(" %s $%02X,Y @ %02X = %02X              ", op_to_str(state.op), zaddr, *from, *fetch);
+    LOG(" %4s $%02X,Y @ %02X = %02X                ", op_to_str(state.op), zaddr, *from, *fetch);
     return 0;
 }
 
@@ -475,7 +475,7 @@ static int mode_absx(u8 *fetch, u16 *from)
 
     *from = (addr + state.x);
     *fetch = cpu_read(*from);
-    LOG(" %s $%04X,X @ %04X = %02X                ", op_to_str(state.op), addr, *from, *fetch);
+    LOG(" %4s $%04X,X @ %04X = %02X            ", op_to_str(state.op), addr, *from, *fetch);
     // check if extra cycle needed (from page cross)
     return (u16)state.x + lo > 0xFF ? 1 : 0;
 }
@@ -489,7 +489,7 @@ static int mode_absy(u8 *fetch, u16 *from)
 
     *from = (addr + state.y);
     *fetch = cpu_read(*from);
-    LOG(" %s $%04X,Y @ %04X = %02X            ", op_to_str(state.op), addr, *from, *fetch);
+    LOG(" %4s $%04X,Y @ %04X = %02X            ", op_to_str(state.op), addr, *from, *fetch);
     // check if extra cycle needed (from page cross)
     return (u16)state.y + lo > 0xFF ? 1 : 0;
 }
@@ -498,7 +498,7 @@ static int mode_absy(u8 *fetch, u16 *from)
 static int mode_imp()
 {
     LOG("      ");
-    LOG(" %s                                ", op_to_str(state.op));
+    LOG(" %4s                                ", op_to_str(state.op));
     return 0;
 }
 
@@ -507,12 +507,11 @@ static int mode_rel(u16 *fetch)
     u16 rel = cpu_read(state.pc++);
     LOG(" %02X   ", rel);
 
-    // turn rel into a signed number (2's complement)
-    u8 carry = (rel & 0x80) >> 7;
-    rel = rel & 0x80 ? ~rel : rel;
+    // turn rel into a signed number
+    rel = rel & 0x80 ? rel | 0xFF00 : rel;
 
-    *fetch = rel + state.pc + carry;
-    LOG(" %s $%04X                          ", op_to_str(state.op), *fetch);
+    *fetch = rel + state.pc;
+    LOG(" %4s $%04X                          ", op_to_str(state.op), *fetch);
     // check if page boundary crossed (bit 8 should be same if no cross)
     return (*fetch ^ state.pc) & 0x0100 ? 1 : 0;
 }
@@ -529,7 +528,7 @@ static int mode_indx(u8 *fetch, u16 *from)
 
     *fetch = cpu_read(addr);
     *from = addr;
-    LOG(" %s ($%02X,X) @ %02X = %04X = %02X       ", op_to_str(state.op), a, ind_addr,
+    LOG(" %4s ($%02X,X) @ %02X = %04X = %02X       ", op_to_str(state.op), a, ind_addr,
         addr, *fetch);
 
     return 0;
@@ -548,7 +547,7 @@ static int mode_indy(u8 *fetch, u16 *from)
 
     *fetch = cpu_read(yaddr);
     *from = yaddr;
-    LOG(" %s (%02X,Y) = %04X @ %04X = %02X      ", op_to_str(state.op), ind_addr, addr,
+    LOG(" %4s (%02X,Y) = %04X @ %04X = %02X      ", op_to_str(state.op), ind_addr, addr,
         yaddr, *fetch);
 
     return (yaddr ^ addr) & 0x0100 ? 1 : 0;
@@ -572,7 +571,7 @@ static int mode_ind(u16 *fetch)
     }
 
     *fetch = (hi << 8) | lo;
-    LOG(" %s ($%04X) = %04X                 ", op_to_str(state.op), ind_addr, *fetch);
+    LOG(" %4s ($%04X) = %04X                 ", op_to_str(state.op), ind_addr, *fetch);
     return 0;
 }
 
@@ -1672,9 +1671,72 @@ static int lsr()
  */
 static int nop()
 {
-    assert(state.op == 0xEA);
-    mode_imp();
-    return 2;
+    int clocks = 0;
+    int extra_clock;
+    u16 dum16;
+    u8 dum8;
+    switch (state.op) {
+    // Standard 1 byte, 2 cycle NOPs
+    // only EA is official
+    case 0x1A: // unofficial
+    case 0x3A: // unofficial
+    case 0x5A: // unofficial
+    case 0x7A: // unofficial
+    case 0xDA: // unofficial
+    case 0xEA: // official
+    case 0xFA: // unofficial
+        mode_imp();
+        clocks = 2;
+        break;
+    // SKB -- NOPs which read an immediate (2 bytes, 2 cycles)
+    // all SKB are unoffical
+    case 0x80:
+    case 0x82:
+    case 0x89:
+    case 0xC2:
+    case 0xE2:
+        mode_imm(&dum8);
+        clocks = 2;
+        break;
+    // IGN -- NOPs which read from memory (2-3 bytes, 3-5 cycles)
+    // all IGN are unofficial
+    // ABS -> 3 bytes, 4 cycles
+    case 0x0C:
+        mode_abs(&dum8, &dum16);
+        clocks = 4;
+        break;
+    // ABSX -> 3 bytes, 4-5 cycles
+    case 0x1C:
+    case 0x3C:
+    case 0x5C:
+    case 0x7C:
+    case 0xDC:
+    case 0xFC:
+        extra_clock = mode_absx(&dum8, &dum16);
+        clocks = 4 + extra_clock;
+        break;
+    // ZP -> 2 bytes, 3 cycles
+    case 0x04:
+    case 0x44:
+    case 0x64:
+        mode_zp(&dum8, &dum16);
+        clocks = 3;
+        break;
+    // ZPX -> 2 bytes, 3 cycles
+    case 0x14:
+    case 0x34:
+    case 0x54:
+    case 0x74:
+    case 0xD4:
+    case 0xF4:
+        mode_zpx(&dum8, &dum16);
+        clocks = 3;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+    return clocks;
 }
 
 /*
