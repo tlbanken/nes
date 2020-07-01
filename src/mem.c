@@ -131,6 +131,10 @@ void cpu_write(u8 data, u16 addr)
 
     // apu/io access
     if (addr >= MC_APU_IO_START && addr <= MC_APU_IO_END) {
+        if (addr == 0x4014) { // OAMDMA
+            ppu_oamdma(data);
+            return;
+        }
         // TODO read the correct apu/io reg
         ERROR("APU/IO regs not available ($%04X)\n", addr);
         EXIT(1);
