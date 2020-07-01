@@ -87,5 +87,14 @@ static int txa();
 static int txs();
 static int tya();
 
+// Unofficial Instruction handlers
+static int lax();
+static int sax();
+static int dcp();
+static int isc();
+static int rla();
+static int rra();
+static int slo();
+static int sre();
 
 #endif

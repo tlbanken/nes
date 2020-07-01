@@ -70,11 +70,11 @@ void cpu_init()
     opmatrix[0x0*16+0x0] = brk;
     opmatrix[0x0*16+0x1] = ora;
     opmatrix[0x0*16+0x2] = undef;
-    opmatrix[0x0*16+0x3] = undef;
+    opmatrix[0x0*16+0x3] = slo; // unofficial
     opmatrix[0x0*16+0x4] = nop; // unofficial
     opmatrix[0x0*16+0x5] = ora;
     opmatrix[0x0*16+0x6] = asl;
-    opmatrix[0x0*16+0x7] = undef;
+    opmatrix[0x0*16+0x7] = slo; // unofficial
     opmatrix[0x0*16+0x8] = php;
     opmatrix[0x0*16+0x9] = ora;
     opmatrix[0x0*16+0xA] = asl;
@@ -82,33 +82,33 @@ void cpu_init()
     opmatrix[0x0*16+0xC] = nop; // unofficial
     opmatrix[0x0*16+0xD] = ora;
     opmatrix[0x0*16+0xE] = asl;
-    opmatrix[0x0*16+0xF] = undef;
+    opmatrix[0x0*16+0xF] = slo; // unofficial
     // MSD 1
     opmatrix[0x1*16+0x0] = bpl;
     opmatrix[0x1*16+0x1] = ora;
     opmatrix[0x1*16+0x2] = undef;
-    opmatrix[0x1*16+0x3] = undef;
+    opmatrix[0x1*16+0x3] = slo; // unofficial
     opmatrix[0x1*16+0x4] = nop; // unofficial
     opmatrix[0x1*16+0x5] = ora;
     opmatrix[0x1*16+0x6] = asl;
-    opmatrix[0x1*16+0x7] = undef;
+    opmatrix[0x1*16+0x7] = slo; // unofficial
     opmatrix[0x1*16+0x8] = clc;
     opmatrix[0x1*16+0x9] = ora;
     opmatrix[0x1*16+0xA] = nop; // unofficial
-    opmatrix[0x1*16+0xB] = undef;
+    opmatrix[0x1*16+0xB] = slo; // unofficial
     opmatrix[0x1*16+0xC] = nop; // unofficial
     opmatrix[0x1*16+0xD] = ora;
     opmatrix[0x1*16+0xE] = asl;
-    opmatrix[0x1*16+0xF] = undef;
+    opmatrix[0x1*16+0xF] = slo; // unofficial
     // MSD 2
     opmatrix[0x2*16+0x0] = jsr;
     opmatrix[0x2*16+0x1] = and;
     opmatrix[0x2*16+0x2] = undef;
-    opmatrix[0x2*16+0x3] = undef;
+    opmatrix[0x2*16+0x3] = rla; // unofficial
     opmatrix[0x2*16+0x4] = bit;
     opmatrix[0x2*16+0x5] = and;
     opmatrix[0x2*16+0x6] = rol;
-    opmatrix[0x2*16+0x7] = undef;
+    opmatrix[0x2*16+0x7] = rla; // unofficial
     opmatrix[0x2*16+0x8] = plp;
     opmatrix[0x2*16+0x9] = and;
     opmatrix[0x2*16+0xA] = rol;
@@ -116,33 +116,33 @@ void cpu_init()
     opmatrix[0x2*16+0xC] = bit;
     opmatrix[0x2*16+0xD] = and;
     opmatrix[0x2*16+0xE] = rol;
-    opmatrix[0x2*16+0xF] = undef;
+    opmatrix[0x2*16+0xF] = rla; // unofficial
     // MSD 3
     opmatrix[0x3*16+0x0] = bmi;
     opmatrix[0x3*16+0x1] = and;
     opmatrix[0x3*16+0x2] = undef;
-    opmatrix[0x3*16+0x3] = undef;
+    opmatrix[0x3*16+0x3] = rla; // unofficial
     opmatrix[0x3*16+0x4] = nop; // unofficial
     opmatrix[0x3*16+0x5] = and;
     opmatrix[0x3*16+0x6] = rol;
-    opmatrix[0x3*16+0x7] = undef;
+    opmatrix[0x3*16+0x7] = rla; // unofficial
     opmatrix[0x3*16+0x8] = sec;
     opmatrix[0x3*16+0x9] = and;
     opmatrix[0x3*16+0xA] = nop; // unofficial
-    opmatrix[0x3*16+0xB] = undef;
+    opmatrix[0x3*16+0xB] = rla; // unofficial
     opmatrix[0x3*16+0xC] = nop; // unofficial
     opmatrix[0x3*16+0xD] = and;
     opmatrix[0x3*16+0xE] = rol;
-    opmatrix[0x3*16+0xF] = undef;
+    opmatrix[0x3*16+0xF] = rla; // unofficial
     // MSD 4
     opmatrix[0x4*16+0x0] = rti;
     opmatrix[0x4*16+0x1] = eor;
     opmatrix[0x4*16+0x2] = undef;
-    opmatrix[0x4*16+0x3] = undef;
+    opmatrix[0x4*16+0x3] = sre; // unofficial
     opmatrix[0x4*16+0x4] = nop; // unofficial
     opmatrix[0x4*16+0x5] = eor;
     opmatrix[0x4*16+0x6] = lsr;
-    opmatrix[0x4*16+0x7] = undef;
+    opmatrix[0x4*16+0x7] = sre; // unofficial
     opmatrix[0x4*16+0x8] = pha;
     opmatrix[0x4*16+0x9] = eor;
     opmatrix[0x4*16+0xA] = lsr;
@@ -150,33 +150,33 @@ void cpu_init()
     opmatrix[0x4*16+0xC] = jmp;
     opmatrix[0x4*16+0xD] = eor;
     opmatrix[0x4*16+0xE] = lsr;
-    opmatrix[0x4*16+0xF] = undef;
+    opmatrix[0x4*16+0xF] = sre; // unofficial
     // MSD 5
     opmatrix[0x5*16+0x0] = bvc;
     opmatrix[0x5*16+0x1] = eor;
     opmatrix[0x5*16+0x2] = undef;
-    opmatrix[0x5*16+0x3] = undef;
+    opmatrix[0x5*16+0x3] = sre; // unofficial
     opmatrix[0x5*16+0x4] = nop; // unofficial
     opmatrix[0x5*16+0x5] = eor;
     opmatrix[0x5*16+0x6] = lsr;
-    opmatrix[0x5*16+0x7] = undef;
+    opmatrix[0x5*16+0x7] = sre; // unofficial
     opmatrix[0x5*16+0x8] = cli;
     opmatrix[0x5*16+0x9] = eor;
     opmatrix[0x5*16+0xA] = nop; // unofficial
-    opmatrix[0x5*16+0xB] = undef;
+    opmatrix[0x5*16+0xB] = sre; // unofficial
     opmatrix[0x5*16+0xC] = nop; // unofficial
     opmatrix[0x5*16+0xD] = eor;
     opmatrix[0x5*16+0xE] = lsr;
-    opmatrix[0x5*16+0xF] = undef;
+    opmatrix[0x5*16+0xF] = sre; // unofficial
     // MSD 6
     opmatrix[0x6*16+0x0] = rts;
     opmatrix[0x6*16+0x1] = adc;
     opmatrix[0x6*16+0x2] = undef;
-    opmatrix[0x6*16+0x3] = undef;
+    opmatrix[0x6*16+0x3] = rra; // unofficial
     opmatrix[0x6*16+0x4] = nop; // unofficial
     opmatrix[0x6*16+0x5] = adc;
     opmatrix[0x6*16+0x6] = ror;
-    opmatrix[0x6*16+0x7] = undef;
+    opmatrix[0x6*16+0x7] = rra; // unofficial
     opmatrix[0x6*16+0x8] = pla;
     opmatrix[0x6*16+0x9] = adc;
     opmatrix[0x6*16+0xA] = ror;
@@ -184,33 +184,33 @@ void cpu_init()
     opmatrix[0x6*16+0xC] = jmp;
     opmatrix[0x6*16+0xD] = adc;
     opmatrix[0x6*16+0xE] = ror;
-    opmatrix[0x6*16+0xF] = undef;
+    opmatrix[0x6*16+0xF] = rra; // unofficial
     // MSD 7
     opmatrix[0x7*16+0x0] = bvs;
     opmatrix[0x7*16+0x1] = adc;
     opmatrix[0x7*16+0x2] = undef;
-    opmatrix[0x7*16+0x3] = undef;
+    opmatrix[0x7*16+0x3] = rra; // unofficial
     opmatrix[0x7*16+0x4] = nop; // unofficial
     opmatrix[0x7*16+0x5] = adc;
     opmatrix[0x7*16+0x6] = ror;
-    opmatrix[0x7*16+0x7] = undef;
+    opmatrix[0x7*16+0x7] = rra; // unofficial
     opmatrix[0x7*16+0x8] = sei;
     opmatrix[0x7*16+0x9] = adc;
     opmatrix[0x7*16+0xA] = nop; // unofficial
-    opmatrix[0x7*16+0xB] = undef;
+    opmatrix[0x7*16+0xB] = rra; // unofficial
     opmatrix[0x7*16+0xC] = nop; // unofficial
     opmatrix[0x7*16+0xD] = adc;
     opmatrix[0x7*16+0xE] = ror;
-    opmatrix[0x7*16+0xF] = undef;
+    opmatrix[0x7*16+0xF] = rra; // unofficial
     // MSD 8
     opmatrix[0x8*16+0x0] = nop; // unofficial
     opmatrix[0x8*16+0x1] = sta;
     opmatrix[0x8*16+0x2] = nop; // unofficial
-    opmatrix[0x8*16+0x3] = undef;
+    opmatrix[0x8*16+0x3] = sax; // unofficial
     opmatrix[0x8*16+0x4] = sty;
     opmatrix[0x8*16+0x5] = sta;
     opmatrix[0x8*16+0x6] = stx;
-    opmatrix[0x8*16+0x7] = undef;
+    opmatrix[0x8*16+0x7] = sax; // unofficial
     opmatrix[0x8*16+0x8] = dey;
     opmatrix[0x8*16+0x9] = nop; // unofficial
     opmatrix[0x8*16+0xA] = txa;
@@ -218,7 +218,7 @@ void cpu_init()
     opmatrix[0x8*16+0xC] = sty;
     opmatrix[0x8*16+0xD] = sta;
     opmatrix[0x8*16+0xE] = stx;
-    opmatrix[0x8*16+0xF] = undef;
+    opmatrix[0x8*16+0xF] = sax; // unofficial
     // MSD 9
     opmatrix[0x9*16+0x0] = bcc;
     opmatrix[0x9*16+0x1] = sta;
@@ -227,7 +227,7 @@ void cpu_init()
     opmatrix[0x9*16+0x4] = sty;
     opmatrix[0x9*16+0x5] = sta;
     opmatrix[0x9*16+0x6] = stx;
-    opmatrix[0x9*16+0x7] = undef;
+    opmatrix[0x9*16+0x7] = sax; // unofficial
     opmatrix[0x9*16+0x8] = tya;
     opmatrix[0x9*16+0x9] = sta;
     opmatrix[0x9*16+0xA] = txs;
@@ -240,11 +240,11 @@ void cpu_init()
     opmatrix[0xA*16+0x0] = ldy;
     opmatrix[0xA*16+0x1] = lda;
     opmatrix[0xA*16+0x2] = ldx;
-    opmatrix[0xA*16+0x3] = undef;
+    opmatrix[0xA*16+0x3] = lax; // unofficial
     opmatrix[0xA*16+0x4] = ldy;
     opmatrix[0xA*16+0x5] = lda;
     opmatrix[0xA*16+0x6] = ldx;
-    opmatrix[0xA*16+0x7] = undef;
+    opmatrix[0xA*16+0x7] = lax; // unofficial
     opmatrix[0xA*16+0x8] = tay;
     opmatrix[0xA*16+0x9] = lda;
     opmatrix[0xA*16+0xA] = tax;
@@ -252,16 +252,16 @@ void cpu_init()
     opmatrix[0xA*16+0xC] = ldy;
     opmatrix[0xA*16+0xD] = lda;
     opmatrix[0xA*16+0xE] = ldx;
-    opmatrix[0xA*16+0xF] = undef;
+    opmatrix[0xA*16+0xF] = lax; // unofficial
     // MSD 11
     opmatrix[0xB*16+0x0] = bcs;
     opmatrix[0xB*16+0x1] = lda;
     opmatrix[0xB*16+0x2] = undef;
-    opmatrix[0xB*16+0x3] = undef;
+    opmatrix[0xB*16+0x3] = lax; // unofficial
     opmatrix[0xB*16+0x4] = ldy;
     opmatrix[0xB*16+0x5] = lda;
     opmatrix[0xB*16+0x6] = ldx;
-    opmatrix[0xB*16+0x7] = undef;
+    opmatrix[0xB*16+0x7] = lax; // unofficial
     opmatrix[0xB*16+0x8] = clv;
     opmatrix[0xB*16+0x9] = lda;
     opmatrix[0xB*16+0xA] = tsx;
@@ -269,16 +269,16 @@ void cpu_init()
     opmatrix[0xB*16+0xC] = ldy;
     opmatrix[0xB*16+0xD] = lda;
     opmatrix[0xB*16+0xE] = ldx;
-    opmatrix[0xB*16+0xF] = undef;
+    opmatrix[0xB*16+0xF] = lax; // unofficial
     // MSD 12
     opmatrix[0xC*16+0x0] = cpy;
     opmatrix[0xC*16+0x1] = cmp;
     opmatrix[0xC*16+0x2] = nop; // unofficial
-    opmatrix[0xC*16+0x3] = undef;
+    opmatrix[0xC*16+0x3] = dcp; // unofficial
     opmatrix[0xC*16+0x4] = cpy;
     opmatrix[0xC*16+0x5] = cmp;
     opmatrix[0xC*16+0x6] = dec;
-    opmatrix[0xC*16+0x7] = undef;
+    opmatrix[0xC*16+0x7] = dcp; // unofficial
     opmatrix[0xC*16+0x8] = iny;
     opmatrix[0xC*16+0x9] = cmp;
     opmatrix[0xC*16+0xA] = dex;
@@ -286,58 +286,58 @@ void cpu_init()
     opmatrix[0xC*16+0xC] = cpy;
     opmatrix[0xC*16+0xD] = cmp;
     opmatrix[0xC*16+0xE] = dec;
-    opmatrix[0xC*16+0xF] = undef;
+    opmatrix[0xC*16+0xF] = dcp; // unofficial
     // MSD 13
     opmatrix[0xD*16+0x0] = bne;
     opmatrix[0xD*16+0x1] = cmp;
     opmatrix[0xD*16+0x2] = undef;
-    opmatrix[0xD*16+0x3] = undef;
+    opmatrix[0xD*16+0x3] = dcp;
     opmatrix[0xD*16+0x4] = nop; // unofficial
     opmatrix[0xD*16+0x5] = cmp;
     opmatrix[0xD*16+0x6] = dec;
-    opmatrix[0xD*16+0x7] = undef;
+    opmatrix[0xD*16+0x7] = dcp; // unofficial
     opmatrix[0xD*16+0x8] = cld;
     opmatrix[0xD*16+0x9] = cmp;
     opmatrix[0xD*16+0xA] = nop; // unofficial
-    opmatrix[0xD*16+0xB] = undef;
+    opmatrix[0xD*16+0xB] = dcp; // unofficial
     opmatrix[0xD*16+0xC] = nop; // unofficial
     opmatrix[0xD*16+0xD] = cmp;
     opmatrix[0xD*16+0xE] = dec;
-    opmatrix[0xD*16+0xF] = undef;
+    opmatrix[0xD*16+0xF] = dcp; // unofficial
     // MSD 14
     opmatrix[0xE*16+0x0] = cpx;
     opmatrix[0xE*16+0x1] = sbc;
     opmatrix[0xE*16+0x2] = nop; // unofficial
-    opmatrix[0xE*16+0x3] = undef;
+    opmatrix[0xE*16+0x3] = isc; // unofficial
     opmatrix[0xE*16+0x4] = cpx;
     opmatrix[0xE*16+0x5] = sbc;
     opmatrix[0xE*16+0x6] = inc;
-    opmatrix[0xE*16+0x7] = undef;
+    opmatrix[0xE*16+0x7] = isc; // unofficial
     opmatrix[0xE*16+0x8] = inx;
     opmatrix[0xE*16+0x9] = sbc;
     opmatrix[0xE*16+0xA] = nop;
-    opmatrix[0xE*16+0xB] = undef;
+    opmatrix[0xE*16+0xB] = sbc; // unofficial
     opmatrix[0xE*16+0xC] = cpx;
     opmatrix[0xE*16+0xD] = sbc;
     opmatrix[0xE*16+0xE] = inc;
-    opmatrix[0xE*16+0xF] = undef;
+    opmatrix[0xE*16+0xF] = isc; // unofficial
     // MSD 15
     opmatrix[0xF*16+0x0] = beq;
     opmatrix[0xF*16+0x1] = sbc;
     opmatrix[0xF*16+0x2] = undef;
-    opmatrix[0xF*16+0x3] = undef;
+    opmatrix[0xF*16+0x3] = isc; // unofficial
     opmatrix[0xF*16+0x4] = nop; // unofficial
     opmatrix[0xF*16+0x5] = sbc;
     opmatrix[0xF*16+0x6] = inc;
-    opmatrix[0xF*16+0x7] = undef;
+    opmatrix[0xF*16+0x7] = isc; // unofficial
     opmatrix[0xF*16+0x8] = sed;
     opmatrix[0xF*16+0x9] = sbc;
     opmatrix[0xF*16+0xA] = nop; // unofficial
-    opmatrix[0xF*16+0xB] = undef;
+    opmatrix[0xF*16+0xB] = isc; // unofficial
     opmatrix[0xF*16+0xC] = nop; // unofficial
     opmatrix[0xF*16+0xD] = sbc;
     opmatrix[0xF*16+0xE] = inc;
-    opmatrix[0xF*16+0xF] = undef;
+    opmatrix[0xF*16+0xF] = isc; // unofficial
 }
 
 int cpu_step()
@@ -1722,7 +1722,7 @@ static int nop()
         mode_zp(&dum8, &dum16);
         clocks = 3;
         break;
-    // ZPX -> 2 bytes, 3 cycles
+    // ZPX -> 2 bytes, 4 cycles
     case 0x14:
     case 0x34:
     case 0x54:
@@ -1730,7 +1730,7 @@ static int nop()
     case 0xD4:
     case 0xF4:
         mode_zpx(&dum8, &dum16);
-        clocks = 3;
+        clocks = 4;
         break;
     default:
         ERROR("Unknown opcode (%02X)\n", state.op);
@@ -2033,6 +2033,7 @@ static int sbc()
     u16 dummy;
     int extra_clock;
     switch (state.op) {
+    case 0xEB: // unofficial
     case 0xE9: // IMM -- 2 bytes, 2 cycles
         mode_imm(&val);
         clocks = 2;
@@ -2342,3 +2343,454 @@ static int tya()
     return 2;
 }
 
+// *** UNOFFICIAL INSTRUCTIONS ***
+// sources:
+// https://wiki.nesdev.com/w/index.php/Programming_with_unofficial_opcodes
+// http://www.oxyron.de/html/opcodes02.html
+
+/*
+ * LAX (Unofficial Combined) - LDA then TAX
+ * Size: 2-3
+ * Cycles: 3-6
+ * Flags: Z, N
+ */
+static int lax()
+{
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    int extra_cycle;
+    switch (state.op) {
+    case 0xA3: // INDX -- 2 bytes, 6 cycles
+        mode_indx(&val, &from);
+        clocks = 6;
+        break;
+    case 0xA7: // ZP -- 2 bytes, 3 cycles
+        mode_zp(&val, &from);
+        clocks = 3;
+        break;
+    case 0xAF: // ABS -- 3 bytes, 4 cycles
+        mode_abs(&val, &from);
+        clocks = 4;
+        break;
+    case 0xB3: // INDY -- 2 bytes, 5-6 cycles
+        extra_cycle = mode_indy(&val, &from);
+        clocks = 5 + extra_cycle;
+        break;
+    case 0xB7: // ZPY -- 2 bytes, 4 cycles
+        mode_zpy(&val, &from);
+        clocks = 4;
+        break;
+    case 0xBF: // ABSY -- 3 bytes, 4 cycles
+        extra_cycle = mode_absy(&val, &from);
+        clocks = 4;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // load acc then transfer to x
+    state.acc = cpu_read(from);
+    state.x = state.acc;
+
+    // set flags
+    set_flag(PSR_Z, state.x == 0);
+    set_flag(PSR_N, state.x & 0x80);
+
+    return clocks;
+}
+
+/*
+ * SAX (Unofficial Combined) - AND A and X then Store into mem
+ * Size: 2-3
+ * Cycles: 3-6
+ * Flags: None
+ */
+static int sax()
+{
+    int clocks = 0;
+    u16 target;
+    u8 val;
+    switch (state.op) {
+    case 0x83: // INDX -- 2 bytes, 6 cycles
+        mode_indx(&val, &target);
+        clocks = 6;
+        break;
+    case 0x87: // ZP -- 2 bytes, 3 cycles
+        mode_zp(&val, &target);
+        clocks = 3;
+        break;
+    case 0x8F: // ABS -- 3 bytes, 4 cycles
+        mode_abs(&val, &target);
+        clocks = 4;
+        break;
+    case 0x97: // ZPY -- 2 bytes, 4 cycles
+        mode_zpy(&val, &target);
+        clocks = 4;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // AND X and A then store
+    u8 res = state.x & state.acc;
+    cpu_write(res, target);
+    return clocks;
+}
+
+
+
+/*
+ * DCP (Unofficial RMW) - DEC then CMP value
+ * Size: 2-3
+ * Cycles: 5-8
+ * Flags: C, Z, N
+ */
+static int dcp()
+{
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    switch (state.op) {
+    case 0xC3: // INDX -- 2 bytes, 8 cycles
+        mode_indx(&val, &from);
+        clocks = 8;
+        break;
+    case 0xC7: // ZP -- 2 bytes, 5 cycles
+        mode_zp(&val, &from);
+        clocks = 5;
+        break;
+    case 0xCF: // ABS -- 2 bytes, 6 cycles
+        mode_abs(&val, &from);
+        clocks = 6;
+        break;
+    case 0xD3: // INDY -- 2 bytes, 8 cycles
+        mode_indy(&val, &from);
+        clocks = 8;
+        break;
+    case 0xD7: // ZPX -- 2 bytes, 6 cycles
+        mode_zpx(&val, &from);
+        clocks = 6;
+        break;
+    case 0xDB: // ABSY -- 3 bytes, 7 cycles
+        mode_absy(&val, &from);
+        clocks = 7;
+        break;
+    case 0xDF: // ABSX -- 3 bytes, 7 cycles
+        mode_absx(&val, &from);
+        clocks = 7;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // DEC then CMP
+    u8 dec_res = val - 1;
+    u8 cmp_res = state.acc - dec_res;
+    cpu_write(dec_res, from);
+
+    // set flags
+    set_flag(PSR_C, state.acc >= dec_res);
+    set_flag(PSR_Z, cmp_res == 0);
+    set_flag(PSR_N, cmp_res & 0x80);
+
+    return clocks;
+}
+
+/*
+ * ISC (Unofficial RMW) - INC then SBC
+ * Size: 2-3
+ * Cycles: 5-8
+ * Flags: C, Z, V, N
+ */
+static int isc()
+{
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    switch (state.op) {
+    case 0xE3: // INDX -- 2 bytes, 8 cycles
+        mode_indx(&val, &from);
+        clocks = 8;
+        break;
+    case 0xE7: // ZP -- 2 bytes, 5 cycles
+        mode_zp(&val, &from);
+        clocks = 5;
+        break;
+    case 0xEF: // ABS -- 3 bytes, 6 cycles
+        mode_abs(&val, &from);
+        clocks = 6;
+        break;
+    case 0xF3: // INDY -- 2 bytes, 8 cycles
+        mode_indy(&val, &from);
+        clocks = 8;
+        break;
+    case 0xF7: // ZPX -- 2 bytes, 6 cycles
+        mode_zpx(&val, &from);
+        clocks = 6;
+        break;
+    case 0xFB: // ABSY -- 3 bytes, 7 cycles
+        mode_absy(&val, &from);
+        clocks = 7;
+        break;
+    case 0xFF: // ABSX -- 3 bytes, 7 cycles
+        mode_absx(&val, &from);
+        clocks = 7;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // INC then SBC
+    u8 inc_res = val + 1;
+    cpu_write(inc_res, from);
+    u8 neg_inc_res = ~inc_res;
+    u16 sbc_res = state.acc + neg_inc_res + (state.psr & PSR_C);
+    state.acc = sbc_res & 0xFF;
+
+    // set the flags
+    set_flag(PSR_C, sbc_res & 0x100);
+    set_flag(PSR_Z, state.acc == 0);
+    set_flag(PSR_V, (sbc_res ^ prev_state.acc) & (neg_inc_res ^ sbc_res) & 0x80);
+    set_flag(PSR_N, state.acc & 0x80);
+
+    return clocks;
+}
+
+/*
+ * RLA (Unofficial RMW) - Rotate Left then AND
+ * Size: 2-3
+ * Cycles: 5-8
+ * Flags: C, Z, N
+ */
+static int rla()
+{
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    switch (state.op) {
+    case 0x23: // INDX -- 2 bytes, 8 cycles
+        mode_indx(&val, &from);
+        clocks = 8;
+        break;
+    case 0x27: // ZP -- 2 bytes, 5 cycles
+        mode_zp(&val, &from);
+        clocks = 5;
+        break;
+    case 0x2F: // ABS -- 3 bytes, 6 cycles
+        mode_abs(&val, &from);
+        clocks = 6;
+        break;
+    case 0x33: // INDY -- 2 bytes, 8 cycles
+        mode_indy(&val, &from);
+        clocks = 8;
+        break;
+    case 0x37: // ZPX -- 2 bytes, 6 cycles
+        mode_zpx(&val, &from);
+        clocks = 6;
+        break;
+    case 0x3B: // ABSY -- 3 bytes, 7 cycles
+        mode_absy(&val, &from);
+        clocks = 7;
+        break;
+    case 0x3F: // ABSX -- 3 bytes, 7 cycles
+        mode_absx(&val, &from);
+        clocks = 7;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // ROL then AND
+    u8 rol_res = val << 1 | (state.psr & PSR_C);
+    cpu_write(rol_res, from);
+    state.acc &= rol_res;
+
+    // set flags
+    set_flag(PSR_C, val & 0x80);
+    set_flag(PSR_Z, state.acc == 0);
+    set_flag(PSR_N, state.acc & 0x80);
+
+    return clocks;
+}
+
+/*
+ * RRA (Unofficial RMW) - Rotate Right then ADC
+ * Size: 2-3
+ * Cycles: 5-8
+ * Flags: C, Z, V, N
+ */
+static int rra()
+{
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    switch (state.op) {
+    case 0x63: // INDX -- 2 bytes, 8 cycles
+        mode_indx(&val, &from);
+        clocks = 8;
+        break;
+    case 0x67: // ZP -- 2 bytes, 5 cycles
+        mode_zp(&val, &from);
+        clocks = 5;
+        break;
+    case 0x6F: // ABS -- 3 bytes, 6 cycles
+        mode_abs(&val, &from);
+        clocks = 6;
+        break;
+    case 0x73: // INDY -- 2 bytes, 8 cycles
+        mode_indy(&val, &from);
+        clocks = 8;
+        break;
+    case 0x77: // ZPX -- 2 bytes, 6 cycles
+        mode_zpx(&val, &from);
+        clocks = 6;
+        break;
+    case 0x7B: // ABSY -- 3 bytes, 7 cycles
+        mode_absy(&val, &from);
+        clocks = 7;
+        break;
+    case 0x7F: // ABSX -- 3 bytes, 7 cycles
+        mode_absx(&val, &from);
+        clocks = 7;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // ROR then ADC
+    u8 ror_res = (val >> 1) | ((state.psr & PSR_C) << 7);
+    cpu_write(ror_res, from);
+    set_flag(PSR_C, val & 0x1);
+    u16 adc_res = state.acc + ror_res + (state.psr & PSR_C);
+    state.acc = adc_res & 0xFF;
+
+    // set flags
+    set_flag(PSR_C, adc_res & 0x100);
+    set_flag(PSR_Z, state.acc == 0);
+    set_flag(PSR_V, ~(ror_res ^ prev_state.acc) & (ror_res ^ adc_res) & 0x80);
+    set_flag(PSR_N, state.acc & 0x80);
+
+    return clocks;
+}
+
+/*
+ * SLO (Unofficial RMW) - ASL then ORA
+ * Size: 2-3
+ * Cycles: 5-8
+ * Flags: C, Z, N
+ */
+static int slo()
+{
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    switch (state.op) {
+    case 0x03: // INDX -- 2 bytes, 8 cycles
+        mode_indx(&val, &from);
+        clocks = 8;
+        break;
+    case 0x07: // ZP -- 2 bytes, 5 cycles
+        mode_zp(&val, &from);
+        clocks = 5;
+        break;
+    case 0x0F: // ABS -- 3 bytes, 6 cycles
+        mode_abs(&val, &from);
+        clocks = 6;
+        break;
+    case 0x13: // INDY -- 2 bytes, 8 cycles
+        mode_indy(&val, &from);
+        clocks = 8;
+        break;
+    case 0x17: // ZPX -- 2 bytes, 6 cycles
+        mode_zpx(&val, &from);
+        clocks = 6;
+        break;
+    case 0x1B: // ABSY -- 3 bytes, 7 cycles
+        mode_absy(&val, &from);
+        clocks = 7;
+        break;
+    case 0x1F: // ABSX -- 3 bytes, 7 cycles
+        mode_absx(&val, &from);
+        clocks = 7;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // ASL then ORA
+    u8 asl_res = val << 1;
+    cpu_write(asl_res, from);
+    state.acc |= asl_res;
+
+    // set flags
+    set_flag(PSR_C, val & 0x80);
+    set_flag(PSR_Z, state.acc == 0);
+    set_flag(PSR_N, state.acc & 0x80);
+
+    return clocks;
+}
+
+/*
+ * SRE (Unofficial RMW) - LSR then EOR
+ * Size: 2-3
+ * Cycles: 5-8
+ * Flags: C, Z, N
+ */
+static int sre()
+{
+    int clocks = 0;
+    u16 from;
+    u8 val;
+    switch (state.op) {
+    case 0x43: // INDX -- 2 bytes, 8 cycles
+        mode_indx(&val, &from);
+        clocks = 8;
+        break;
+    case 0x47: // ZP -- 2 bytes, 5 cycles
+        mode_zp(&val, &from);
+        clocks = 5;
+        break;
+    case 0x4F: // ABS -- 3 bytes, 6 cycles
+        mode_abs(&val, &from);
+        clocks = 6;
+        break;
+    case 0x53: // INDY -- 2 bytes, 8 cycles
+        mode_indy(&val, &from);
+        clocks = 8;
+        break;
+    case 0x57: // ZPX -- 2 bytes, 6 cycles
+        mode_zpx(&val, &from);
+        clocks = 6;
+        break;
+    case 0x5B: // ABSY -- 3 bytes, 7 cycles
+        mode_absy(&val, &from);
+        clocks = 7;
+        break;
+    case 0x5F: // ABSX -- 3 bytes, 7 cycles
+        mode_absx(&val, &from);
+        clocks = 7;
+        break;
+    default:
+        ERROR("Unknown opcode (%02X)\n", state.op);
+        EXIT(1);
+    }
+
+    // LSR then EOR
+    u8 lsr_res = val >> 1;
+    cpu_write(lsr_res, from);
+    state.acc ^= lsr_res;
+
+    // set flags
+    set_flag(PSR_C, val & 0x1);
+    set_flag(PSR_Z, state.acc == 0);
+    set_flag(PSR_N, state.acc & 0x80);
+    return clocks;
+}

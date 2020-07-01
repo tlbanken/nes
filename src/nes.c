@@ -40,7 +40,7 @@ static void exit_handler(int rc)
 
 static void run()
 {
-    int limit = 6000;
+    int limit = 9000;
     int rounds = 0;
     // int cycles;
     while (rounds < limit) {
@@ -81,7 +81,7 @@ int main(int argc, char **argv)
     cpu_init();
 
     // TODO do the nes stuff here
-    run()    ;
+    run();
 
     neslog_cleanup();
     return 0;
