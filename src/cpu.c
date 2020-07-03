@@ -380,16 +380,16 @@ void cpu_reset()
     u16 lo = cpu_read(RESET_VECTOR);
     u16 hi = cpu_read(RESET_VECTOR + 1);
     state.pc = (hi << 8) | lo;
-    state.pc = 0xC000; // NOTE: FOR TESTING
-    // state.sp = 0xFF;
-    state.sp = 0xFD; // NOTE: FOR TESTING
-    // state.psr = 0x34;
-    state.psr = 0x24; // NOTE: FOR TESTING
+    // state.pc = 0xC000; // NOTE: FOR TESTING
+    state.sp = 0xFF;
+    // state.sp = 0xFD; // NOTE: FOR TESTING
+    state.psr = 0x34;
+    // state.psr = 0x24; // NOTE: FOR TESTING
     state.x = 0;
     state.y = 0;
     state.acc = 0;
-    // state.cycle = 0;
-    state.cycle = 7; // NOTE: FOR TESTING
+    state.cycle = 0;
+    // state.cycle = 7; // NOTE: FOR TESTING
 }
 
 // *** PSR HELPERS ***

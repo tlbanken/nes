@@ -88,15 +88,17 @@ u8 cpu_read(u16 addr)
     // apu/io reads
     if (addr >= MC_APU_IO_START && addr <= MC_APU_IO_END) {
         // TODO read the correct apu/io reg
-        ERROR("APU/IO regs not available ($%04X)\n", addr);
-        EXIT(1);
+        WARNING("APU/IO regs not available ($%04X)\n", addr);
+        // EXIT(1);
+        return 0;
     }
 
     // disabled apu/io reads
     if (addr >= MC_APU_IO_TEST_START && addr <= MC_APU_IO_TEST_END) {
         // TODO ???
-        ERROR("APU/IO test regs not available ($%04X)\n", addr);
-        EXIT(1);
+        WARNING("APU/IO test regs not available ($%04X)\n", addr);
+        // EXIT(1);
+        return 0;
     }
 
     // cartridge access
@@ -136,15 +138,17 @@ void cpu_write(u8 data, u16 addr)
             return;
         }
         // TODO read the correct apu/io reg
-        ERROR("APU/IO regs not available ($%04X)\n", addr);
-        EXIT(1);
+        WARNING("APU/IO regs not available ($%04X)\n", addr);
+        // EXIT(1);
+        return;
     }
 
     // disabled apu/io access
     if (addr >= MC_APU_IO_TEST_START && addr <= MC_APU_IO_TEST_END) {
         // TODO ???
-        ERROR("APU/IO test regs not available ($%04X)\n", addr);
-        EXIT(1);
+        WARNING("APU/IO test regs not available ($%04X)\n", addr);
+        // EXIT(1);
+        return;
     }
 
     // cartridge access

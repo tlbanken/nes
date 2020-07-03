@@ -14,6 +14,8 @@
 #include <mem.h>
 #include <cart.h>
 #include <cpu.h>
+#include <ppu.h>
+#include <periphs.h>
 
 static void sighandler(int sig)
 {
@@ -35,17 +37,23 @@ static void exit_handler(int rc)
         mem_dump();
         cart_dump();
         neslog_cleanup();
+        periphs_free();
     }
 }
 
 static void run()
 {
-    int limit = 9000;
+    // int limit = 9000;
     int rounds = 0;
-    // int cycles;
-    while (rounds < limit) {
-        cpu_step();
+    int cycles;
+    while (true) {
+        cycles = cpu_step();
+        ppu_step(3 * cycles);
         rounds++;
+        if (rounds % 50 == 0) {
+            periphs_refresh();
+        }
+        periphs_poll();
     }
 }
 
@@ -79,10 +87,13 @@ int main(int argc, char **argv)
     // init hw
     cart_load(rompath);
     cpu_init();
+    ppu_init();
+    periphs_init();
 
     // TODO do the nes stuff here
     run();
 
+    periphs_free();
     neslog_cleanup();
     return 0;
 }
