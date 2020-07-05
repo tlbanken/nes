@@ -10,6 +10,7 @@
 #include <utils.h>
 #include <mem.h>
 #include <periphs.h>
+#include <cpu.h>
 
 // Object Attrubute Memory
 static u8 oam[256] = {0};
@@ -297,11 +298,32 @@ void ppu_init()
     assert(sizeof(reg_ppustatus_t) == 1);
     assert(sizeof(loopyreg_t) == 2);
 
-    // init screen state
+
+    // setup initial state
     cycle = 0;
     scanline = 261;
+    al_first_write = true;
+    ppudata_buf = 0;
+    oddframe = false;
 
-    // set up color table
+    ppuctrl.raw = 0;
+    ppumask.raw = 0;
+    ppustatus.raw = 0;
+    oamaddr = 0;
+
+    ppuaddr.raw = 0;
+    ppuaddr_tmp.raw = 0;
+
+    fine_x = 0;
+
+    bgshifter_ptrn_lo = 0;
+    bgshifter_ptrn_hi = 0;
+    bgshifter_attr_lo = 0;
+    bgshifter_attr_hi = 0;
+    nx_bgtile_id = 0;
+    nx_bgtile_attr = 0;
+
+    clear_screen();
 }
 
 void ppu_step(int clock_budget)
@@ -315,6 +337,9 @@ void ppu_step(int clock_budget)
 
         if (cycle == 1 && scanline == 241) {
             ppustatus.field.vblank = 1;
+            if (ppuctrl.field.nmi_gen) {
+                cpu_nmi();
+            }
         }
 
         if (cycle == 1 && scanline == 261) {
@@ -409,9 +434,15 @@ u8 ppu_reg_read(u16 reg)
     switch (reg) {
     case 0: // PPUCTRL
         // no read access
+        #ifdef DEBUG
+        data = ppuctrl.raw;
+        #endif
         break;
     case 1: // PPUMASK
         // no read access
+        #ifdef DEBUG
+        data = ppumask.raw;
+        #endif
         break;
     case 2: // PPUSTATUS
         data = ppustatus.raw;
@@ -420,15 +451,24 @@ u8 ppu_reg_read(u16 reg)
         break;
     case 3: // OAMADDR
         // no read access
+        #ifdef DEBUG
+        data = oamaddr;
+        #endif
         break;
     case 4: // OAMDATA
         data = oam[oamaddr];
         break;
     case 5: // PPUSCROLL
         // no read access
+        #ifdef DEBUG
+        data = ppuaddr.raw;
+        #endif
         break;
     case 6: // PPUADDR
         // no read access
+        #ifdef DEBUG
+        data = ppuaddr.raw;
+        #endif
         break;
     case 7: // PPUDATA
         data = ppudata_buf;

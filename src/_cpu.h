@@ -9,24 +9,24 @@
 
 // I don't want to accidentily include this in any other file other than cpu.c
 #ifdef __CPU_H
-#error "Only one include of _cpu.h allowed!\n"
+#error "Only one include of _cpu.h allowed!"
 #else
 #define __CPU_H
 
 // address modes
-static int mode_acc(u8 *fetch);
-static int mode_imm(u8 *fetch);
-static int mode_abs(u8 *fetch, u16 *from);
-static int mode_zp(u8 *fetch, u16 *from);
-static int mode_zpx(u8 *fetch, u16 *from);
-static int mode_zpy(u8 *fetch, u16 *from);
+static void mode_acc(u8 *fetch);
+static void mode_imm(u8 *fetch);
+static void mode_abs(u8 *fetch, u16 *from);
+static void mode_zp(u8 *fetch, u16 *from);
+static void mode_zpx(u8 *fetch, u16 *from);
+static void mode_zpy(u8 *fetch, u16 *from);
 static int mode_absx(u8 *fetch, u16 *from);
 static int mode_absy(u8 *fetch, u16 *from);
-static int mode_imp();
+static void mode_imp();
 static int mode_rel(u16 *fetch);
-static int mode_indx(u8 *fetch, u16 *from);
+static void mode_indx(u8 *fetch, u16 *from);
 static int mode_indy(u8 *fetch, u16 *from);
-static int mode_ind(u16 *fetch);
+static void mode_ind(u16 *fetch);
 
 // intruction handlers
 static int undef();

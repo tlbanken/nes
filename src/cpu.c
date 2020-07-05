@@ -364,14 +364,59 @@ int cpu_step()
 // *** INTERRUPT GENERATORS ***
 void cpu_irq()
 {
-    ERROR("IRQ not supported!\n");
-    EXIT(1);
+    // check if interrupts disabled
+    if (state.psr & PSR_I) {
+        return;
+    }
+
+    // push pc
+    u16 pc_lo = state.pc & 0x00FF;
+    u16 pc_hi = (state.pc & 0xFF00) >> 8;
+    cpu_write(pc_hi, SP);
+    state.sp--;
+    cpu_write(pc_lo, SP);
+    state.sp--;
+    // push psr with B1 flag
+    cpu_write(state.psr | PSR_B1, SP);
+    state.sp--;
+    // side effect
+    state.psr |= PSR_I;
+
+    // call NMI vector
+    u16 lo = cpu_read(IRQ_VECTOR);
+    u16 hi = cpu_read(IRQ_VECTOR + 1);
+    state.pc = (hi << 8) | lo;
+
+    // pop back state
+    state.pc = (pc_hi << 8) | pc_lo;
+    state.sp += 3;
+    state.psr = cpu_read(SP) & ~PSR_B1;
 }
 
 void cpu_nmi()
 {
-    ERROR("NMI not supported!\n");
-    EXIT(1);
+    // push pc
+    u16 pc_lo = state.pc & 0x00FF;
+    u16 pc_hi = (state.pc & 0xFF00) >> 8;
+    cpu_write(pc_hi, SP);
+    state.sp--;
+    cpu_write(pc_lo, SP);
+    state.sp--;
+    // push psr with B1 flag
+    cpu_write(state.psr | PSR_B1, SP);
+    state.sp--;
+    // side effect
+    state.psr |= PSR_I;
+
+    // call NMI vector
+    u16 lo = cpu_read(NMI_VECTOR);
+    u16 hi = cpu_read(NMI_VECTOR + 1);
+    state.pc = (hi << 8) | lo;
+
+    // pop back state
+    state.pc = (pc_hi << 8) | pc_lo;
+    state.sp += 3;
+    state.psr = cpu_read(SP) & ~PSR_B1;
 }
 
 // initial values according to http://wiki.nesdev.com/w/index.php/CPU_power_up_state
@@ -404,66 +449,96 @@ static void set_flag(enum psr_flags flag, bool cond)
 
 // *** ADDRESS MODE HANDLERS ***
 // NOTE: Nothing to be fetched (but we log for consistancy)
-static int mode_acc(u8 *fetch)
+static void mode_acc(u8 *fetch)
 {
+    assert(fetch != NULL);
     LOG("      ");
     LOG(" %4s A                              ", op_to_str(state.op));
     *fetch = state.acc;
-    return 0;
 }
 
-static int mode_imm(u8 *fetch)
+static void mode_imm(u8 *fetch)
 {
+    assert(fetch != NULL);
     *fetch = cpu_read(state.pc++);
     LOG(" %02X   ", *fetch);
     LOG(" %4s #$%02X                           ", op_to_str(state.op), *fetch);
-    return 0;
 }
 
-static int mode_abs(u8 *fetch, u16 *from)
+static void mode_abs(u8 *fetch, u16 *from)
 {
     u16 lo = cpu_read(state.pc++);
     u16 hi = cpu_read(state.pc++);
     LOG(" %02X %02X", lo, hi);
     u16 addr = (hi << 8) | lo;
 
-    *fetch = cpu_read(addr);
-    *from = addr;
-    LOG(" %4s $%04X = %02X                     ", op_to_str(state.op), addr, *fetch);
-    return 0;
+    LOG(" %4s $%04X", op_to_str(state.op), addr);
+    if (fetch != NULL) {
+        *fetch = cpu_read(addr);
+        LOG(" = %02X                     ", *fetch);
+    } else {
+        LOG("                          ");
+    }
+
+    if (from != NULL) {
+        *from = addr;
+    }
 }
 
-static int mode_zp(u8 *fetch, u16 *from)
+static void mode_zp(u8 *fetch, u16 *from)
 {
     u16 zaddr = cpu_read(state.pc++);
     LOG(" %02X   ", zaddr);
 
-    *fetch = cpu_read(zaddr);
-    *from = zaddr;
-    LOG(" %4s $%02X = %02X                       ", op_to_str(state.op), zaddr, *fetch);
-    return 0;
+    LOG(" %4s $%02X", op_to_str(state.op), zaddr);
+    if (fetch != NULL) {
+        *fetch = cpu_read(zaddr);
+        LOG(" = %02X                       ", *fetch);
+    } else {
+        LOG("                            ");
+    }
+
+    if (from != NULL) {
+        *from = zaddr;
+    }
 }
 
-static int mode_zpx(u8 *fetch, u16 *from)
+static void mode_zpx(u8 *fetch, u16 *from)
 {
     u16 zaddr = cpu_read(state.pc++);
     LOG(" %02X   ", zaddr);
 
-    *from = (zaddr + state.x) & 0xFF;
-    *fetch = cpu_read(*from);
-    LOG(" %4s $%02X,X @ %02X = %02X                ", op_to_str(state.op), zaddr, *from, *fetch);
-    return 0;
+    u16 addr = (zaddr + state.x) & 0xFF;
+    LOG(" %4s $%02X,X @ %02X", op_to_str(state.op), zaddr, addr);
+    if (fetch != NULL) {
+        *fetch = cpu_read(addr);
+        LOG(" = %02X                ", *fetch);
+    } else {
+        LOG("                     ");
+    }
+
+    if (from != NULL) {
+        *from = addr;
+    }
 }
 
-static int mode_zpy(u8 *fetch, u16 *from)
+static void mode_zpy(u8 *fetch, u16 *from)
 {
     u16 zaddr = cpu_read(state.pc++);
     LOG(" %02X   ", zaddr);
 
-    *from = (zaddr + state.y) & 0xFF;
-    *fetch = cpu_read(*from);
-    LOG(" %4s $%02X,Y @ %02X = %02X                ", op_to_str(state.op), zaddr, *from, *fetch);
-    return 0;
+    u16 addr = (zaddr + state.y) & 0xFF;
+    LOG(" %4s $%02X,Y @ %02X", op_to_str(state.op), zaddr, addr);
+    if (fetch != NULL) {
+        *fetch = cpu_read(addr);
+        LOG(" = %02X                ", *fetch);
+    } else {
+        LOG("                     ");
+    }
+
+    if (from != NULL) {
+        *from = addr;
+    }
 }
 
 static int mode_absx(u8 *fetch, u16 *from)
@@ -473,9 +548,18 @@ static int mode_absx(u8 *fetch, u16 *from)
     u16 addr = (hi << 8) | lo;
     LOG(" %02X %02X", lo, hi);
 
-    *from = (addr + state.x);
-    *fetch = cpu_read(*from);
-    LOG(" %4s $%04X,X @ %04X = %02X            ", op_to_str(state.op), addr, *from, *fetch);
+    u16 xaddr = (addr + state.x);
+    LOG(" %4s $%04X,X @ %04X", op_to_str(state.op), addr, xaddr);
+    if (fetch != NULL) {
+        *fetch = cpu_read(xaddr);
+        LOG(" = %02X            ", *fetch);
+    } else {
+        LOG("                 ");
+    }
+
+    if (from != NULL) {
+        *from = xaddr;
+    }
     // check if extra cycle needed (from page cross)
     return (u16)state.x + lo > 0xFF ? 1 : 0;
 }
@@ -487,23 +571,32 @@ static int mode_absy(u8 *fetch, u16 *from)
     u16 addr = (hi << 8) | lo;
     LOG(" %02X %02X", lo, hi);
 
-    *from = (addr + state.y);
-    *fetch = cpu_read(*from);
-    LOG(" %4s $%04X,Y @ %04X = %02X            ", op_to_str(state.op), addr, *from, *fetch);
+    u16 yaddr = (addr + state.y);
+    LOG(" %4s $%04X,Y @ %04X", op_to_str(state.op), addr, yaddr);
+    if (fetch != NULL) {
+        *fetch = cpu_read(yaddr);
+        LOG(" = %02X            ", *fetch);
+    } else {
+        LOG("                 ");
+    }
+
+    if (from != NULL) {
+        *from = yaddr;
+    }
     // check if extra cycle needed (from page cross)
     return (u16)state.y + lo > 0xFF ? 1 : 0;
 }
 
 // NOTE: nothing to fetch, but we still need to log
-static int mode_imp()
+static void mode_imp()
 {
     LOG("      ");
     LOG(" %4s                                ", op_to_str(state.op));
-    return 0;
 }
 
 static int mode_rel(u16 *fetch)
 {
+    assert(fetch != NULL);
     u16 rel = cpu_read(state.pc++);
     LOG(" %02X   ", rel);
 
@@ -516,7 +609,7 @@ static int mode_rel(u16 *fetch)
     return (*fetch ^ state.pc) & 0x0100 ? 1 : 0;
 }
 
-static int mode_indx(u8 *fetch, u16 *from)
+static void mode_indx(u8 *fetch, u16 *from)
 {
     u16 a = cpu_read(state.pc++);
     u16 ind_addr = (a + state.x) & 0xFF;
@@ -526,12 +619,17 @@ static int mode_indx(u8 *fetch, u16 *from)
     u16 hi = cpu_read((ind_addr + 1) & 0xFF);
     u16 addr = (hi << 8) | lo;
 
-    *fetch = cpu_read(addr);
-    *from = addr;
-    LOG(" %4s ($%02X,X) @ %02X = %04X = %02X       ", op_to_str(state.op), a, ind_addr,
-        addr, *fetch);
+    LOG(" %4s ($%02X,X) @ %02X = %04X", op_to_str(state.op), a, ind_addr, addr);
+    if (fetch != NULL) {
+        *fetch = cpu_read(addr);
+        LOG(" = %02X       ", *fetch);
+    } else {
+        LOG("            ");
+    }
 
-    return 0;
+    if (from != NULL) {
+        *from = addr;
+    }
 }
 
 static int mode_indy(u8 *fetch, u16 *from)
@@ -545,16 +643,23 @@ static int mode_indy(u8 *fetch, u16 *from)
     u16 addr = (hi << 8) | lo;
     u16 yaddr = addr + state.y;
 
-    *fetch = cpu_read(yaddr);
-    *from = yaddr;
-    LOG(" %4s (%02X,Y) = %04X @ %04X = %02X      ", op_to_str(state.op), ind_addr, addr,
-        yaddr, *fetch);
+    LOG(" %4s (%02X,Y) = %04X @ %04X", op_to_str(state.op), ind_addr, addr, yaddr);
+    if (fetch != NULL) {
+        *fetch = cpu_read(yaddr);
+        LOG(" = %02X      ", *fetch);
+    } else {
+        LOG("           ");
+    }
 
+    if (from != NULL) {
+        *from = yaddr;
+    }
     return (yaddr ^ addr) & 0x0100 ? 1 : 0;
 }
 
-static int mode_ind(u16 *fetch)
+static void mode_ind(u16 *fetch)
 {
+    assert(fetch != NULL);
     u16 ind_lo = cpu_read(state.pc++);
     u16 ind_hi = cpu_read(state.pc++);
     LOG(" %02X %02X", ind_lo, ind_hi);
@@ -572,7 +677,6 @@ static int mode_ind(u16 *fetch)
 
     *fetch = (hi << 8) | lo;
     LOG(" %4s ($%04X) = %04X                 ", op_to_str(state.op), ind_addr, *fetch);
-    return 0;
 }
 
 
@@ -594,7 +698,6 @@ static int adc()
 {
     int clocks = 0;
     u8 val;
-    u16 dummy;
     int extra_clock;
     switch (state.op) {
     case 0x69: // IMM -- 2 bytes, 2 cycles
@@ -602,31 +705,31 @@ static int adc()
         clocks = 2;
         break;
     case 0x65: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &dummy);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0x75: // ZPX -- 2 bytes, 4 cycles
-        mode_zpx(&val, &dummy);
+        mode_zpx(&val, NULL);
         clocks = 4;
         break;
     case 0x6D: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &dummy);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     case 0x7D: // ABSX -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absx(&val, &dummy);
+        extra_clock = mode_absx(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0x79: // ABSY -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absy(&val, &dummy);
+        extra_clock = mode_absy(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0x61: // INDX -- 2 bytes, 6 cycles
-        mode_indx(&val, &dummy);
+        mode_indx(&val, NULL);
         clocks = 6;
         break;
     case 0x71: // INDY -- 2 bytes, 5 (+1) cycles
-        extra_clock = mode_indy(&val, &dummy);
+        extra_clock = mode_indy(&val, NULL);
         clocks = 5 + extra_clock;
         break;
     default:
@@ -657,7 +760,6 @@ static int and()
 {
     int clocks = 0;
     u8 val;
-    u16 dummy;
     int extra_clock;
     switch (state.op) {
     case 0x29: // IMM -- 2 bytes, 2 cycles
@@ -665,31 +767,31 @@ static int and()
         clocks = 2;
         break;
     case 0x25: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &dummy);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0x35: // ZPX -- 2 bytes, 4 cycles
-        mode_zpx(&val, &dummy);
+        mode_zpx(&val, NULL);
         clocks = 4;
         break;
     case 0x2D: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &dummy);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     case 0x3D: // ABSX -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absx(&val, &dummy);
+        extra_clock = mode_absx(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0x39: // ABSY -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absy(&val, &dummy);
+        extra_clock = mode_absy(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0x21: // INDX -- 2 bytes, 6 cycles
-        mode_indx(&val, &dummy);
+        mode_indx(&val, NULL);
         clocks = 6;
         break;
     case 0x31: // INDY -- 2 bytes, 5 (+1) cycles
-        extra_clock = mode_indy(&val, &dummy);
+        extra_clock = mode_indy(&val, NULL);
         clocks = 5 + extra_clock;
         break;
     default:
@@ -829,15 +931,14 @@ static int beq()
 static int bit()
 {
     int clocks = 0;
-    u16 from;
     u8 val;
     switch (state.op) {
     case 0x24: // ZP -- bytes 2, cycles 3
-        mode_zp(&val, &from);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0x2C: // ABS -- bytes 3, cycles 4
-        mode_abs(&val, &from);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     default:
@@ -1050,7 +1151,6 @@ static int cmp()
 {
     int clocks = 0;
     u8 val;
-    u16 dummy;
     int extra_clock;
     switch (state.op) {
     case 0xC9: // IMM -- 2 bytes, 2 cycles
@@ -1058,31 +1158,31 @@ static int cmp()
         clocks = 2;
         break;
     case 0xC5: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &dummy);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0xD5: // ZPX -- 2 bytes, 4 cycles
-        mode_zpx(&val, &dummy);
+        mode_zpx(&val, NULL);
         clocks = 4;
         break;
     case 0xCD: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &dummy);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     case 0xDD: // ABSX -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absx(&val, &dummy);
+        extra_clock = mode_absx(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0xD9: // ABSY -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absy(&val, &dummy);
+        extra_clock = mode_absy(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0xC1: // INDX -- 2 bytes, 6 cycles
-        mode_indx(&val, &dummy);
+        mode_indx(&val, NULL);
         clocks = 6;
         break;
     case 0xD1: // INDY -- 2 bytes, 5 (+1) cycles
-        extra_clock = mode_indy(&val, &dummy);
+        extra_clock = mode_indy(&val, NULL);
         clocks = 5 + extra_clock;
         break;
     default:
@@ -1110,7 +1210,6 @@ static int cmp()
 static int cpx()
 {
     int clocks = 0;
-    u16 from;
     u8 val;
     switch (state.op) {
     case 0xE0: // IMM -- 2 bytes, 2 cycles
@@ -1118,11 +1217,11 @@ static int cpx()
         clocks = 2;
         break;
     case 0xE4: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &from);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0xEC: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &from);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     default:
@@ -1150,7 +1249,6 @@ static int cpx()
 static int cpy()
 {
     int clocks = 0;
-    u16 from;
     u8 val;
     switch (state.op) {
     case 0xC0: // IMM -- 2 bytes, 2 cycles
@@ -1158,11 +1256,11 @@ static int cpy()
         clocks = 2;
         break;
     case 0xC4: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &from);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0xCC: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &from);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     default:
@@ -1269,7 +1367,6 @@ static int eor()
 {
     int clocks = 0;
     u8 val;
-    u16 dummy;
     int extra_clock;
     switch (state.op) {
     case 0x49: // IMM -- 2 bytes, 2 cycles
@@ -1277,31 +1374,31 @@ static int eor()
         clocks = 2;
         break;
     case 0x45: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &dummy);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0x55: // ZPX -- 2 bytes, 4 cycles
-        mode_zpx(&val, &dummy);
+        mode_zpx(&val, NULL);
         clocks = 4;
         break;
     case 0x4D: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &dummy);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     case 0x5D: // ABSX -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absx(&val, &dummy);
+        extra_clock = mode_absx(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0x59: // ABSY -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absy(&val, &dummy);
+        extra_clock = mode_absy(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0x41: // INDX -- 2 bytes, 6 cycles
-        mode_indx(&val, &dummy);
+        mode_indx(&val, NULL);
         clocks = 6;
         break;
     case 0x51: // INDY -- 2 bytes, 5 (+1) cycles
-        extra_clock = mode_indy(&val, &dummy);
+        extra_clock = mode_indy(&val, NULL);
         clocks = 5 + extra_clock;
         break;
     default:
@@ -1407,10 +1504,9 @@ static int jmp()
 {
     int clocks = 0;
     u16 target;
-    u8 dummy;
     switch (state.op) {
     case 0x4C: // ABS -- 3 bytes, 3 cycles
-        mode_abs(&dummy, &target);
+        mode_abs(NULL, &target);
         clocks = 3;
         break;
     case 0x6C: // IND -- 3 bytes, 5 cycles
@@ -1438,8 +1534,7 @@ static int jsr()
 {
     assert(state.op == 0x20);
     u16 target;
-    u8 dummy;
-    mode_abs(&dummy, &target);
+    mode_abs(NULL, &target);
     // push (pc - 1) to stack
     state.pc--;
     cpu_write(state.pc >> 8, SP);
@@ -1461,7 +1556,6 @@ static int lda()
 {
     int clocks = 0;
     u8 val;
-    u16 dummy;
     int extra_clock;
     switch (state.op) {
     case 0xA9: // IMM -- 2 bytes, 2 cycles
@@ -1469,31 +1563,31 @@ static int lda()
         clocks = 2;
         break;
     case 0xA5: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &dummy);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0xB5: // ZPX -- 2 bytes, 4 cycles
-        mode_zpx(&val, &dummy);
+        mode_zpx(&val, NULL);
         clocks = 4;
         break;
     case 0xAD: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &dummy);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     case 0xBD: // ABSX -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absx(&val, &dummy);
+        extra_clock = mode_absx(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0xB9: // ABSY -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absy(&val, &dummy);
+        extra_clock = mode_absy(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0xA1: // INDX -- 2 bytes, 6 cycles
-        mode_indx(&val, &dummy);
+        mode_indx(&val, NULL);
         clocks = 6;
         break;
     case 0xB1: // INDY -- 2 bytes, 5 (+1) cycles
-        extra_clock = mode_indy(&val, &dummy);
+        extra_clock = mode_indy(&val, NULL);
         clocks = 5 + extra_clock;
         break;
     default:
@@ -1521,7 +1615,6 @@ static int ldx()
 {
     int clocks = 0;
     int extra_clock;
-    u16 from;
     u8 val;
     switch (state.op) {
     case 0xA2: // IMM - 2 bytes, 2 cycles
@@ -1529,19 +1622,19 @@ static int ldx()
         clocks = 2;
         break;
     case 0xA6: // ZP - 2 bytes, 3 cycles
-        mode_zp(&val, &from);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0xB6: // ZPY - 2 bytes, 4 cycles
-        mode_zpy(&val, &from);
+        mode_zpy(&val, NULL);
         clocks = 4;
         break;
     case 0xAE: // ABS - 3 bytes, 4 cycles
-        mode_abs(&val, &from);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     case 0xBE: // ABSY - 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absy(&val, &from);
+        extra_clock = mode_absy(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     default:
@@ -1569,7 +1662,6 @@ static int ldy()
 {
     int clocks = 0;
     int extra_clock;
-    u16 from;
     u8 val;
     switch (state.op) {
     case 0xA0: // IMM - 2 bytes, 2 cycles
@@ -1577,19 +1669,19 @@ static int ldy()
         clocks = 2;
         break;
     case 0xA4: // ZP - 2 bytes, 3 cycles
-        mode_zp(&val, &from);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0xB4: // ZPX - 2 bytes, 4 cycles
-        mode_zpx(&val, &from);
+        mode_zpx(&val, NULL);
         clocks = 4;
         break;
     case 0xAC: // ABS - 3 bytes, 4 cycles
-        mode_abs(&val, &from);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     case 0xBC: // ABSX - 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absx(&val, &from);
+        extra_clock = mode_absx(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     default:
@@ -1673,8 +1765,7 @@ static int nop()
 {
     int clocks = 0;
     int extra_clock;
-    u16 dum16;
-    u8 dum8;
+    u8 dum;
     switch (state.op) {
     // Standard 1 byte, 2 cycle NOPs
     // only EA is official
@@ -1695,14 +1786,14 @@ static int nop()
     case 0x89:
     case 0xC2:
     case 0xE2:
-        mode_imm(&dum8);
+        mode_imm(&dum);
         clocks = 2;
         break;
     // IGN -- NOPs which read from memory (2-3 bytes, 3-5 cycles)
     // all IGN are unofficial
     // ABS -> 3 bytes, 4 cycles
     case 0x0C:
-        mode_abs(&dum8, &dum16);
+        mode_abs(NULL, NULL);
         clocks = 4;
         break;
     // ABSX -> 3 bytes, 4-5 cycles
@@ -1712,14 +1803,14 @@ static int nop()
     case 0x7C:
     case 0xDC:
     case 0xFC:
-        extra_clock = mode_absx(&dum8, &dum16);
+        extra_clock = mode_absx(NULL, NULL);
         clocks = 4 + extra_clock;
         break;
     // ZP -> 2 bytes, 3 cycles
     case 0x04:
     case 0x44:
     case 0x64:
-        mode_zp(&dum8, &dum16);
+        mode_zp(NULL, NULL);
         clocks = 3;
         break;
     // ZPX -> 2 bytes, 4 cycles
@@ -1729,7 +1820,7 @@ static int nop()
     case 0x74:
     case 0xD4:
     case 0xF4:
-        mode_zpx(&dum8, &dum16);
+        mode_zpx(NULL, NULL);
         clocks = 4;
         break;
     default:
@@ -1749,7 +1840,6 @@ static int ora()
 {
     int clocks = 0;
     u8 val;
-    u16 dummy;
     int extra_clock;
     switch (state.op) {
     case 0x09: // IMM -- 2 bytes, 2 cycles
@@ -1757,31 +1847,31 @@ static int ora()
         clocks = 2;
         break;
     case 0x05: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &dummy);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0x15: // ZPX -- 2 bytes, 4 cycles
-        mode_zpx(&val, &dummy);
+        mode_zpx(&val, NULL);
         clocks = 4;
         break;
     case 0x0D: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &dummy);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     case 0x1D: // ABSX -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absx(&val, &dummy);
+        extra_clock = mode_absx(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0x19: // ABSY -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absy(&val, &dummy);
+        extra_clock = mode_absy(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0x01: // INDX -- 2 bytes, 6 cycles
-        mode_indx(&val, &dummy);
+        mode_indx(&val, NULL);
         clocks = 6;
         break;
     case 0x11: // INDY -- 2 bytes, 5 (+1) cycles
-        extra_clock = mode_indy(&val, &dummy);
+        extra_clock = mode_indy(&val, NULL);
         clocks = 5 + extra_clock;
         break;
     default:
@@ -2030,7 +2120,6 @@ static int sbc()
 {
     int clocks = 0;
     u8 val;
-    u16 dummy;
     int extra_clock;
     switch (state.op) {
     case 0xEB: // unofficial
@@ -2039,31 +2128,31 @@ static int sbc()
         clocks = 2;
         break;
     case 0xE5: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &dummy);
+        mode_zp(&val, NULL);
         clocks = 3;
         break;
     case 0xF5: // ZPX -- 2 bytes, 4 cycles
-        mode_zpx(&val, &dummy);
+        mode_zpx(&val, NULL);
         clocks = 4;
         break;
     case 0xED: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &dummy);
+        mode_abs(&val, NULL);
         clocks = 4;
         break;
     case 0xFD: // ABSX -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absx(&val, &dummy);
+        extra_clock = mode_absx(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0xF9: // ABSY -- 3 bytes, 4 (+1) cycles
-        extra_clock = mode_absy(&val, &dummy);
+        extra_clock = mode_absy(&val, NULL);
         clocks = 4 + extra_clock;
         break;
     case 0xE1: // INDX -- 2 bytes, 6 cycles
-        mode_indx(&val, &dummy);
+        mode_indx(&val, NULL);
         clocks = 6;
         break;
     case 0xF1: // INDY -- 2 bytes, 5 (+1) cycles
-        extra_clock = mode_indy(&val, &dummy);
+        extra_clock = mode_indy(&val, NULL);
         clocks = 5 + extra_clock;
         break;
     default:
@@ -2138,34 +2227,33 @@ static int sta()
 {
     int clocks = 0;
     u16 from;
-    u8 val;
     switch (state.op) {
     case 0x85: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &from);
+        mode_zp(NULL, &from);
         clocks = 3;
         break;
     case 0x95: // ZPX -- 2 bytes, 4 cycles
-        mode_zpx(&val, &from);
+        mode_zpx(NULL, &from);
         clocks = 4;
         break;
     case 0x8D: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &from);
+        mode_abs(NULL, &from);
         clocks = 4;
         break;
     case 0x9D: // ABSX -- 3 bytes, 5 cycles
-        mode_absx(&val, &from);
+        mode_absx(NULL, &from);
         clocks = 5;
         break;
     case 0x99: // ABSY -- 3 bytes, 5 cycles
-        mode_absy(&val, &from);
+        mode_absy(NULL, &from);
         clocks = 5;
         break;
     case 0x81: // INDX -- 2 bytes, 6 cycles
-        mode_indx(&val, &from);
+        mode_indx(NULL, &from);
         clocks = 6;
         break;
     case 0x91: // INDY -- 2 bytes, 6 cycles
-        mode_indy(&val, &from);
+        mode_indy(NULL, &from);
         clocks = 6;
         break;
     default:
@@ -2188,18 +2276,17 @@ static int stx()
 {
     int clocks = 0;
     u16 from;
-    u8 val;
     switch (state.op) {
     case 0x86: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &from);
+        mode_zp(NULL, &from);
         clocks = 3;
         break;
     case 0x96: // ZPY -- 2 bytes, 4 cycles
-        mode_zpy(&val, &from);
+        mode_zpy(NULL, &from);
         clocks = 4;
         break;
     case 0x8E: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &from);
+        mode_abs(NULL, &from);
         clocks = 4;
         break;
     default:
@@ -2221,18 +2308,17 @@ static int sty()
 {
     int clocks = 0;
     u16 from;
-    u8 val;
     switch (state.op) {
     case 0x84: // ZP -- 2 bytes, 3 cycles
-        mode_zp(&val, &from);
+        mode_zp(NULL, &from);
         clocks = 3;
         break;
     case 0x94: // ZPX -- 2 bytes, 4 cycles
-        mode_zpx(&val, &from);
+        mode_zpx(NULL, &from);
         clocks = 4;
         break;
     case 0x8C: // ABS -- 3 bytes, 4 cycles
-        mode_abs(&val, &from);
+        mode_abs(NULL, &from);
         clocks = 4;
         break;
     default:
