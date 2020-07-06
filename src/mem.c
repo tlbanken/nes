@@ -44,32 +44,8 @@ enum cpu_memmap {
 static u8 iram[MC_IRAM_SIZE] = {0};
 static u8 cartmem[MC_CART_SIZE] = {0};
 
-// Memory map for the ppu address space
-enum ppu_memmap {
-    // Pattern table found on CHR-ROM from cartridge
-    MP_PT_START = 0x0000,
-    MP_PT_END   = 0x1FFF,
-    MP_PT_SIZE  = (8*1024),
 
-    // Nametables stored on VRAM
-    MP_NT_START = 0x2000,
-    MP_NT_END   = 0x2FFF,
-    MP_NT_SIZE  = (4*1024),
-
-    // Usually a mirror of the nametables up to $2EFF
-    MP_NT_MIR_START = 0x3000,
-    MP_NT_MIR_END   = 0x3EFF,
-    MP_NT_MIR_SIZE  = (MP_NT_MIR_END - MP_NT_MIR_START + 1),
-
-    // Pallete Control
-    MP_PAL_START = 0x3F00,
-    MP_PAL_END   = 0x3FFF,
-    MP_PAL_SIZE  = 256
-};
-static u8 chrrom[MP_PT_SIZE] = {0};
-static u8 vram[MP_NT_SIZE] = {0};
-static u8 palmem[MP_PAL_SIZE] = {0};
-
+// *** CPU ADDRESS SPACE ***
 u8 cpu_read(u16 addr)
 {
     // internal ram access
@@ -164,30 +140,126 @@ void cpu_write(u8 data, u16 addr)
     EXIT(1);
 }
 
+// *** PPU ADDRESS SPACE ***
+// Memory map for the ppu address space
+enum ppu_memmap {
+    // Pattern table found on CHR-ROM from cartridge
+    MP_PT_START = 0x0000,
+    MP_PT_END   = 0x1FFF,
+    MP_PT_SIZE  = (8*1024),
+
+    // Nametables stored on VRAM
+    MP_NT_START = 0x2000,
+    MP_NT_END   = 0x2FFF,
+    MP_NT_SIZE  = (4*1024),
+
+    // Usually a mirror of the nametables up to $2EFF
+    MP_NT_MIR_START = 0x3000,
+    MP_NT_MIR_END   = 0x3EFF,
+    MP_NT_MIR_SIZE  = (MP_NT_MIR_END - MP_NT_MIR_START + 1),
+
+    // Pallete Control
+    MP_PAL_START = 0x3F00,
+    MP_PAL_END   = 0x3FFF,
+    MP_PAL_SIZE  = 256
+};
+static u8 chrrom[MP_PT_SIZE] = {0};
+static u8 vram[MP_NT_SIZE] = {0};
+static u8 palmem[MP_PAL_SIZE] = {0};
+
+// Name tables
+enum NT_MAP {
+    // tile info
+    NT_NUM_TILES = 32,
+
+    // table addr
+    NT_TOPL = 0x2000,
+    NT_TOPR = 0x2400,
+    NT_BOTL = 0x2800,
+    NT_BOTR = 0x2C00,
+    NT_SIZE = 1024 // 1KB
+};
+
+// Attribute tables
+enum AT_MAP {
+    AT_TOPL = 0x23C0,
+    AT_TOPR = 0x27C0,
+    AT_BOTL = 0x2BC0,
+    AT_BOTR = 0x2FC0,
+    AT_SIZE = 64
+};
+
+static enum mirror_mode mirror_mode;
+void mem_set_mirror_mode(enum mirror_mode mm)
+{
+    mirror_mode = mm;
+}
+
+static u16 mirror(u16 addr)
+{
+    assert(addr >= MP_NT_START);
+
+    switch (mirror_mode) {
+    case MIR_HORZ:
+        if (addr >= NT_TOPL && addr < NT_TOPR) {
+            addr = addr; // no mirror
+        } else if (addr < NT_BOTL) {
+            addr -= NT_SIZE;
+        } else if (addr < NT_BOTR) {
+            addr -= NT_SIZE;
+        } else {
+            addr -= (NT_SIZE * 2);
+        }
+        break;
+    case MIR_VERT:
+        if (addr >= NT_TOPL && addr < NT_BOTL) {
+            addr = addr; // no mirror needed
+        } else {
+            addr -= (NT_SIZE * 2);
+        }
+        break;
+    case MIR_4SCRN:
+        ERROR("No support for 4 screen mirror mode!\n");
+        EXIT(1);
+        break;
+    }
+    return addr - MP_NT_START;
+}
+
 u8 ppu_read(u16 addr)
 {
     // Pattern table access
     if (addr <= MP_PT_END) {
+        addr = cart_ppu_map(addr);
         return chrrom[addr];
     }
 
     // Nametable access
     if (addr >= MP_NT_START && addr <= MP_NT_END) {
-        addr -= MP_NT_START;
+        addr = mirror(addr);
         return vram[addr];
     }
 
     // Nametable mirror access
     if (addr >= MP_NT_MIR_START && addr <= MP_NT_MIR_END) {
-        addr -= 0x1000;
-        addr -= MP_NT_START;
+        addr = mirror(addr - 0x1000);
         return vram[addr];
     }
 
     // pallete access
     if (addr >= MP_PAL_START && addr <= MP_PAL_END) {
-        addr = cart_ppu_map(addr);
-        addr -= MP_PAL_START;
+        // adjust for mirrors
+        addr = (addr - MP_PAL_START) % MP_PAL_SIZE;
+        // one byte mirrors
+        if (addr == 0x10) {
+            addr = 0x00;
+        } else if (addr == 0x14) {
+            addr = 0x04;
+        } else if (addr == 0x18) {
+            addr = 0x08;
+        } else if (addr == 0x1C) {
+            addr = 0x0C;
+        }
         return palmem[addr];
     }
 
@@ -201,29 +273,39 @@ void ppu_write(u8 data, u16 addr)
 {
     // Pattern table access
     if (addr <= MP_PT_END) {
+        addr = cart_ppu_map(addr);
         chrrom[addr] = data;
         return;
     }
 
     // Nametable access
     if (addr >= MP_NT_START && addr <= MP_NT_END) {
-        addr -= MP_NT_START;
+        addr = mirror(addr);
         vram[addr] = data;
         return;
     }
 
     // Nametable mirror access
     if (addr >= MP_NT_MIR_START && addr <= MP_NT_MIR_END) {
-        addr -= 0x1000;
-        addr -= MP_NT_START;
+        addr = mirror(addr - 0x1000);
         vram[addr] = data;
         return;
     }
 
     // pallete access
     if (addr >= MP_PAL_START && addr <= MP_PAL_END) {
-        addr = cart_ppu_map(addr);
-        addr -= MP_PAL_START;
+        // adjust for mirrors
+        addr = (addr - MP_PAL_START) % MP_PAL_SIZE;
+        // one byte mirrors
+        if (addr == 0x10) {
+            addr = 0x00;
+        } else if (addr == 0x14) {
+            addr = 0x04;
+        } else if (addr == 0x18) {
+            addr = 0x08;
+        } else if (addr == 0x1C) {
+            addr = 0x0C;
+        }
         palmem[addr] = data;
         return;
     }
@@ -233,6 +315,7 @@ void ppu_write(u8 data, u16 addr)
     WARNING("Attempt to write past ppu address $3FFF ($%02X -> $%04X)\n", data, addr);
 }
 
+// *** DEBUG TOOLS ***
 void mem_dump()
 {
     // dump iram

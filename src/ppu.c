@@ -12,6 +12,8 @@
 #include <periphs.h>
 #include <cpu.h>
 
+#define LOG(fmt, ...) neslog(LID_PPU, fmt, ##__VA_ARGS__);
+
 // Object Attrubute Memory
 static u8 oam[256] = {0};
 
@@ -183,14 +185,14 @@ static nes_color_t nes_colors[] =
 
 static inline bool in_render_zone()
 {
-    return ((cycle >= 1 && cycle <= 257) || (cycle >= 321 && cycle <= 340)) && 
-            ((scanline >= 0 || scanline <= 239) || scanline == 261);
+    return ((cycle >= 1 && cycle <= 257) || (cycle >= 321 && cycle <= 340))
+        && ((scanline >= 0 || scanline <= 239) || scanline == 261);
 }
 
 static void render_px()
 {
     if (ppumask.field.render_bg) {
-        u16 fine_bit = 0x1 << fine_x;
+        u16 fine_bit = 0x8000 >> fine_x;
         u8 px0 = bgshifter_ptrn_lo & fine_bit ? 1 : 0;
         u8 px1 = bgshifter_ptrn_hi & fine_bit ? 1 : 0;
         u8 bg_px = (px1 << 1) | px0;
@@ -213,7 +215,7 @@ static void render_px()
 
 // increment course_x as described here:
 // https://wiki.nesdev.com/w/index.php/PPU_scrolling
-static void scroll_horz()
+static void incr_horz()
 {
     if (ppumask.field.render_bg || ppumask.field.render_sprites) {
         if (ppuaddr.field.course_x == 31) {
@@ -236,7 +238,7 @@ static void reset_horz()
 
 // increment course_y as described here:
 // https://wiki.nesdev.com/w/index.php/PPU_scrolling
-static void scroll_vert()
+static void incr_vert()
 {
     // check that rendering is on, then increment y
     if (ppumask.field.render_bg || ppumask.field.render_sprites) {
@@ -269,10 +271,10 @@ static void reset_vert()
 static void shift_bgshifters()
 {
     if (ppumask.field.render_bg) {
-        bgshifter_ptrn_lo >>= 1;
-        bgshifter_ptrn_hi >>= 1;
-        bgshifter_attr_lo >>= 1;
-        bgshifter_attr_hi >>= 1;
+        bgshifter_ptrn_lo <<= 1;
+        bgshifter_ptrn_hi <<= 1;
+        bgshifter_attr_lo <<= 1;
+        bgshifter_attr_hi <<= 1;
     }
 }
 
@@ -282,12 +284,12 @@ static void load_bgshifters()
     // pixel. Here we load the future byte into the msb of the 16-bit shifters
 
     // pattern bits
-    bgshifter_ptrn_lo = (bgshifter_ptrn_lo & 0x00FF) | ((nx_bgtile & 0xFF) << 8);
-    bgshifter_ptrn_hi = (bgshifter_ptrn_hi & 0x00FF) | (nx_bgtile & 0xFF00);
+    bgshifter_ptrn_lo = (bgshifter_ptrn_lo & 0xFF00) | (nx_bgtile & 0xFF);
+    bgshifter_ptrn_hi = (bgshifter_ptrn_hi & 0xFF00) | (nx_bgtile >> 8);
 
     // attribute bits
-    bgshifter_attr_lo = (bgshifter_attr_lo & 0x00FF) | (nx_bgtile_attr & 0x1 ? 0xFF00 : 0x00);
-    bgshifter_attr_hi = (bgshifter_attr_hi & 0x00FF) | (nx_bgtile_attr & 0x2 ? 0xFF00 : 0x00);
+    bgshifter_attr_lo = (bgshifter_attr_lo & 0xFF00) | (nx_bgtile_attr & 0x1 ? 0xFF : 0x00);
+    bgshifter_attr_hi = (bgshifter_attr_hi & 0xFF00) | (nx_bgtile_attr & 0x2 ? 0xFF : 0x00);
 }
 
 void ppu_init()
@@ -326,25 +328,14 @@ void ppu_init()
     clear_screen();
 }
 
-void ppu_step(int clock_budget)
+bool ppu_step(int clock_budget)
 {
+    bool frame_finished = false;
     // run as many cycles as the budget allows
     for (int clocks = 0; clocks < clock_budget; clocks++) {
         // free cycle on oddframe
-        if (cycle == 0 && oddframe) {
-            clocks--;
-        }
-
-        if (cycle == 1 && scanline == 241) {
-            ppustatus.field.vblank = 1;
-            if (ppuctrl.field.nmi_gen) {
-                cpu_nmi();
-            }
-        }
-
-        if (cycle == 1 && scanline == 261) {
-            ppustatus.field.vblank = 0;
-            // TODO sprite 0 stuff, overflow...
+        if (cycle == 0 && oddframe && scanline == 0) {
+            cycle = 1;
         }
 
         if (in_render_zone()) {
@@ -365,8 +356,8 @@ void ppu_step(int clock_budget)
             case 2:
                 // fetch tile attribute
                 addr = 0x23C0; // base location of attributes
-                addr |= (ppuaddr.field.x_nt << 11);
-                addr |= (ppuaddr.field.y_nt << 10);
+                addr |= (ppuaddr.field.y_nt << 11);
+                addr |= (ppuaddr.field.x_nt << 10);
                 // course x/y only need 3 msb
                 addr |= ((ppuaddr.field.course_y >> 2) << 3);
                 addr |= (ppuaddr.field.course_x >> 2);
@@ -397,35 +388,55 @@ void ppu_step(int clock_budget)
                 nx_bgtile |= (hi << 8);
                 break;
             case 7:
-                scroll_horz();
+                incr_horz();
                 break;
             }
 
-            render_px();
+        }
+
+        // out of visible scanline region
+        
+        if (cycle == 1 && scanline == 241) {
+            ppustatus.field.vblank = 1;
+            if (ppuctrl.field.nmi_gen) {
+                cpu_nmi();
+            }
+        }
+
+        if (cycle == 1 && scanline == 261) {
+            ppustatus.field.vblank = 0;
+            // TODO sprite 0 stuff, overflow...
         }
 
         if (cycle == 256) {
-            scroll_vert();
+            incr_vert();
         }
 
         if (cycle == 257) {
+            load_bgshifters();
             reset_horz();
         }
 
-        if (cycle >= 280 && cycle <= 305 && scanline == 261) {
+        if (cycle >= 280 && cycle <= 304 && scanline == 261) {
             reset_vert();
         }
 
 
+        render_px();
         // increase screen state
         cycle = (cycle + 1) % NUM_CYCLES;
         if (cycle == 0) {
             scanline = (scanline + 1) % NUM_SCANLINES;
             if (scanline == 0) {
                 oddframe = !oddframe;
+                frame_finished = true;
             }
         }
+        LOG("CY:%03u SL:%03u OD:%u    C:%02X M:%02X S:%02X V:%04X T:%04X    RENDER: %u\n",
+            cycle, scanline, oddframe, ppuctrl.raw, ppumask.raw, ppustatus.raw,
+            ppuaddr.raw, ppuaddr_tmp.raw, in_render_zone());
     }
+    return frame_finished;
 }
 
 u8 ppu_reg_read(u16 reg)
@@ -547,4 +558,58 @@ void ppu_oamdma(u8 hi)
         oam[oamaddr] = val;
         oamaddr++;
     }
+}
+
+void ppu_dump()
+{
+    FILE *ofile = fopen("ppu.dump", "w");
+    if (ofile == NULL) {
+        perror("fopen");
+        return;
+    }
+    fprintf(ofile, "---------------------------------------\n");
+    fprintf(ofile, "PPU REGS\n");
+    fprintf(ofile, "---------------------------------------\n");
+    fprintf(ofile, "$2000 (PPUCTRL)   = %02X\n", ppuctrl.raw);
+    fprintf(ofile, "   x_nt        : %u\n", ppuctrl.field.x_nt);
+    fprintf(ofile, "   y_nt        : %u\n", ppuctrl.field.y_nt);
+    fprintf(ofile, "   vram_incr   : %u\n", ppuctrl.field.vram_incr);
+    fprintf(ofile, "   sprite_side : %u\n", ppuctrl.field.sprite_side);
+    fprintf(ofile, "   bg_side     : %u\n", ppuctrl.field.bg_side);
+    fprintf(ofile, "   sprite_size : %u\n", ppuctrl.field.sprite_size);
+    fprintf(ofile, "   master_slave: %u\n", ppuctrl.field.master_slave);
+    fprintf(ofile, "   nmi_gen     : %u\n", ppuctrl.field.nmi_gen);
+    fprintf(ofile, "\n");
+    fprintf(ofile, "$2001 (PPUMASK)   = %02X\n", ppumask.raw);
+    fprintf(ofile, "   greyscale      : %u\n", ppumask.field.greyscale);
+    fprintf(ofile, "   render_lbg     : %u\n", ppumask.field.render_lbg);
+    fprintf(ofile, "   render_lsprites: %u\n", ppumask.field.render_lsprites);
+    fprintf(ofile, "   render_bg      : %u\n", ppumask.field.render_bg);
+    fprintf(ofile, "   render_sprites : %u\n", ppumask.field.render_sprites);
+    fprintf(ofile, "   emph_red       : %u\n", ppumask.field.emph_red);
+    fprintf(ofile, "   emph_green     : %u\n", ppumask.field.emph_green);
+    fprintf(ofile, "   emph_blue      : %u\n", ppumask.field.emph_blue);
+    fprintf(ofile, "\n");
+    fprintf(ofile, "$2002 (PPUSTATUS) = %02X\n", ppustatus.raw);
+    fprintf(ofile, "   sprite_overflow: %u\n", ppustatus.field.sprite_overflow);
+    fprintf(ofile, "   sprite0_hit    : %u\n", ppustatus.field.sprite0_hit);
+    fprintf(ofile, "   vblank         : %u\n", ppustatus.field.vblank);
+    fprintf(ofile, "\n");
+    fprintf(ofile, "$2003 (OAMADDR)   = %02X\n", oamaddr);
+    fprintf(ofile, "\n");
+    fprintf(ofile, "$2007 (PPUADDR)   = %04X\n", ppuaddr.raw);
+    fprintf(ofile, "   course_x: %u\n", ppuaddr.field.course_x);
+    fprintf(ofile, "   course_y: %u\n", ppuaddr.field.course_y);
+    fprintf(ofile, "   x_nt    : %u\n", ppuaddr.field.x_nt);
+    fprintf(ofile, "   y_nt    : %u\n", ppuaddr.field.y_nt);
+    fprintf(ofile, "   fine_y  : %u\n", ppuaddr.field.fine_y);
+    fprintf(ofile, "\n");
+    fprintf(ofile, "$2007 (PPUADDR_TEMP)   = %04X\n", ppuaddr_tmp.raw);
+    fprintf(ofile, "   course_x: %u\n", ppuaddr_tmp.field.course_x);
+    fprintf(ofile, "   course_y: %u\n", ppuaddr_tmp.field.course_y);
+    fprintf(ofile, "   x_nt    : %u\n", ppuaddr_tmp.field.x_nt);
+    fprintf(ofile, "   y_nt    : %u\n", ppuaddr_tmp.field.y_nt);
+    fprintf(ofile, "   fine_y  : %u\n", ppuaddr_tmp.field.fine_y);
+    fprintf(ofile, "---------------------------------------\n");
+    fclose(ofile);
 }

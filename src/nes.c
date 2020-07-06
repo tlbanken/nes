@@ -36,6 +36,7 @@ static void exit_handler(int rc)
     if (rc != OK) {
         mem_dump();
         cart_dump();
+        ppu_dump();
         neslog_cleanup();
         periphs_free();
     }
@@ -46,14 +47,29 @@ static void run()
     // int limit = 9000;
     int rounds = 0;
     int cycles;
+    bool paused = false;
+    bool frame_mode = false;
+    bool frame_finished = false;
     while (true) {
-        cycles = cpu_step();
-        ppu_step(3 * cycles);
-        rounds++;
-        if (rounds % 50 == 0) {
-            periphs_refresh();
+        enum nes_keycode kc = periphs_poll();
+        if (kc == KEY_PAUSE) {
+            paused = true;
+        } else if (kc == KEY_CONTINUE) {
+            paused = false;
+            frame_mode = false;
+        } else if (kc == KEY_FRAME_STEP) {
+            frame_mode = true;
+            paused = true;
         }
-        periphs_poll();
+
+        if (!paused || kc == KEY_STEP || (frame_mode && !frame_finished)) {
+            cycles = cpu_step();
+            frame_finished = ppu_step(3 * cycles);
+            rounds++;
+            if (rounds % 50 == 0 || kc == KEY_STEP) {
+                periphs_refresh();
+            }
+        }
     }
 }
 
@@ -82,13 +98,15 @@ int main(int argc, char **argv)
     set_exit_handler(exit_handler);
 
     neslog_init();
-    neslog_add(LID_CPU, "cpu.log");
+    // neslog_add(LID_CPU, "cpu.log");
+    // neslog_add(LID_PPU, "ppu.log");
 
     // init hw
     cart_load(rompath);
     cpu_init();
     ppu_init();
     periphs_init();
+    mem_set_mirror_mode(cart_get_mirror_mode());
 
     // TODO do the nes stuff here
     run();

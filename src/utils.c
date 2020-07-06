@@ -55,8 +55,7 @@ void neslog(lid_t id, const char *fmt, ...)
 
     // make sure log id valid
     if (lmap[id] == NULL) {
-        ERROR("Invalid log id (%d)\n", id);
-        exit(1);
+        return;
     }
 
     va_list args;

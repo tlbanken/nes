@@ -175,7 +175,7 @@ u16 cart_ppu_map(u16 addr)
     return 0;
 }
 
-mirror_mode_t cart_get_mirror_mode()
+enum mirror_mode cart_get_mirror_mode()
 {
     // first check if four screen mode on
     if (inesh.flags.fourscreen_mir) {
