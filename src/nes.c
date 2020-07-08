@@ -47,7 +47,9 @@ static void run()
     // int limit = 9000;
     int rounds = 0;
     int cycles;
+    // bool paused = true; // NOTE: TESTING
     bool paused = false;
+    // bool frame_mode = true; // NOTE: TESTING
     bool frame_mode = false;
     bool frame_finished = false;
     while (true) {
@@ -100,6 +102,7 @@ int main(int argc, char **argv)
     neslog_init();
     // neslog_add(LID_CPU, "cpu.log");
     // neslog_add(LID_PPU, "ppu.log");
+    // neslog_add(LID_PPU, NULL);
 
     // init hw
     cart_load(rompath);

@@ -263,8 +263,9 @@ static void incr_vert()
 static void reset_vert()
 {
     if (ppumask.field.render_bg || ppumask.field.render_sprites) {
-        ppuaddr.field.course_x = ppuaddr_tmp.field.course_y;
+        ppuaddr.field.course_y = ppuaddr_tmp.field.course_y;
         ppuaddr.field.y_nt = ppuaddr_tmp.field.y_nt;
+        ppuaddr.field.fine_y = ppuaddr_tmp.field.fine_y;
     }
 }
 
@@ -337,6 +338,13 @@ bool ppu_step(int clock_budget)
         if (cycle == 0 && oddframe && scanline == 0) {
             cycle = 1;
         }
+        LOG("CY:%03u SL:%03u OD:%u    C:%02X M:%02X S:%02X V:%04X T:%04X    RENDER: %u\n",
+            cycle, scanline, oddframe, ppuctrl.raw, ppumask.raw, ppustatus.raw,
+            ppuaddr.raw, ppuaddr_tmp.raw, in_render_zone());
+
+        // if (scanline == 0) {
+        //     ppuaddr = ppuaddr_tmp;
+        // }
 
         if (in_render_zone()) {
             // update the shifter registers
@@ -394,25 +402,16 @@ bool ppu_step(int clock_budget)
 
         }
 
-        // out of visible scanline region
-        
-        if (cycle == 1 && scanline == 241) {
-            ppustatus.field.vblank = 1;
-            if (ppuctrl.field.nmi_gen) {
-                cpu_nmi();
-            }
-        }
-
         if (cycle == 1 && scanline == 261) {
             ppustatus.field.vblank = 0;
             // TODO sprite 0 stuff, overflow...
         }
 
-        if (cycle == 256) {
+        if (cycle == 256 && (scanline < 240 || scanline == 261)) {
             incr_vert();
         }
 
-        if (cycle == 257) {
+        if (cycle == 257 && (scanline < 240 || scanline == 261)) {
             load_bgshifters();
             reset_horz();
         }
@@ -421,6 +420,16 @@ bool ppu_step(int clock_budget)
             reset_vert();
         }
 
+        // ********************************
+        // Out of visible scanline region
+        // ********************************
+        
+        if (cycle == 1 && scanline == 241) {
+            ppustatus.field.vblank = 1;
+            if (ppuctrl.field.nmi_gen) {
+                cpu_nmi();
+            }
+        }
 
         render_px();
         // increase screen state
@@ -432,9 +441,6 @@ bool ppu_step(int clock_budget)
                 frame_finished = true;
             }
         }
-        LOG("CY:%03u SL:%03u OD:%u    C:%02X M:%02X S:%02X V:%04X T:%04X    RENDER: %u\n",
-            cycle, scanline, oddframe, ppuctrl.raw, ppumask.raw, ppustatus.raw,
-            ppuaddr.raw, ppuaddr_tmp.raw, in_render_zone());
     }
     return frame_finished;
 }
@@ -530,7 +536,7 @@ void ppu_reg_write(u8 val, u16 reg)
     case 6: // PPUADDR
         if (al_first_write) {
             ppuaddr_tmp.raw = (((u16)val & 0x3F) << 8) | (ppuaddr_tmp.raw & 0x00FF);
-            ppuaddr_tmp.field.fine_y &= 0x3; // turn off bit 14
+            // ppuaddr_tmp.field.fine_y &= 0x3; // turn off bit 14
         } else {
             ppuaddr_tmp.raw = (ppuaddr_tmp.raw & 0xFF00) | val;
             ppuaddr.raw = ppuaddr_tmp.raw; // copy over temp to cur
