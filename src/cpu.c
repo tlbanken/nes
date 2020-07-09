@@ -19,6 +19,8 @@
 // static function prototypes
 #include "_cpu.h"
 
+#define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
+
 #define SP (0x0100 | state.sp)
 
 // interrupt vector locations
@@ -60,8 +62,10 @@ typedef struct cpu_state {
 static cpu_state_t state;
 static cpu_state_t prev_state;
 
+static bool is_init = false;
 void cpu_init()
 {
+    is_init = true;
     // set initial state to RESET state
     cpu_reset();
 
@@ -338,10 +342,14 @@ void cpu_init()
     opmatrix[0xF*16+0xD] = sbc;
     opmatrix[0xF*16+0xE] = inc;
     opmatrix[0xF*16+0xF] = isc; // unofficial
+
 }
 
 int cpu_step()
 {
+#ifdef DEBUG
+    CHECK_INIT
+#endif
     prev_state = state;
     LOG("%04X ", state.pc);
     // fetch instruction
@@ -364,6 +372,9 @@ int cpu_step()
 // *** INTERRUPT GENERATORS ***
 void cpu_irq()
 {
+#ifdef DEBUG
+    CHECK_INIT
+#endif
     // check if interrupts disabled
     if (state.psr & PSR_I) {
         return;
@@ -395,6 +406,9 @@ void cpu_irq()
 
 void cpu_nmi()
 {
+#ifdef DEBUG
+    CHECK_INIT
+#endif
     // push pc
     u16 pc_lo = state.pc & 0x00FF;
     u16 pc_hi = (state.pc & 0xFF00) >> 8;
@@ -422,6 +436,9 @@ void cpu_nmi()
 // initial values according to http://wiki.nesdev.com/w/index.php/CPU_power_up_state
 void cpu_reset()
 {
+#ifdef DEBUG
+    CHECK_INIT
+#endif
     u16 lo = cpu_read(RESET_VECTOR);
     u16 hi = cpu_read(RESET_VECTOR + 1);
     state.pc = (hi << 8) | lo;

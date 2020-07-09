@@ -14,6 +14,16 @@
 #include <cart.h>
 #include <ppu.h>
 
+#define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
+
+static bool is_init = false;
+void mem_init()
+{
+    is_init = true;
+}
+
+// *** CPU ADDRESS SPACE ***
+
 // Memory map for the cpu address space
 enum cpu_memmap {
     // CPU internal ram (mirrored)
@@ -44,10 +54,11 @@ enum cpu_memmap {
 static u8 iram[MC_IRAM_SIZE] = {0};
 static u8 cartmem[MC_CART_SIZE] = {0};
 
-
-// *** CPU ADDRESS SPACE ***
 u8 cpu_read(u16 addr)
 {
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     // internal ram access
     if (addr <= MC_IRAM_END) {
         return iram[addr % MC_IRAM_SIZE];
@@ -92,6 +103,9 @@ u8 cpu_read(u16 addr)
 
 void cpu_write(u8 data, u16 addr)
 {
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     // internal ram access
     if (addr <= MC_IRAM_END) {
         iram[addr % MC_IRAM_SIZE] = data;
@@ -189,16 +203,15 @@ enum AT_MAP {
     AT_SIZE = 64
 };
 
-static enum mirror_mode mirror_mode;
-void mem_set_mirror_mode(enum mirror_mode mm)
-{
-    mirror_mode = mm;
-}
 
 static u16 mirror(u16 addr)
 {
+#ifdef DEBUG
+    CHECK_INIT;
     assert(addr >= MP_NT_START);
+#endif
 
+    enum mirror_mode mirror_mode = cart_get_mirror_mode();
     switch (mirror_mode) {
     case MIR_HORZ:
         if (addr >= NT_TOPL && addr < NT_TOPR) {
@@ -228,6 +241,9 @@ static u16 mirror(u16 addr)
 
 u8 ppu_read(u16 addr)
 {
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     // Pattern table access
     if (addr <= MP_PT_END) {
         addr = cart_ppu_map(addr);
@@ -271,6 +287,9 @@ u8 ppu_read(u16 addr)
 
 void ppu_write(u8 data, u16 addr)
 {
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     // Pattern table access
     if (addr <= MP_PT_END) {
         addr = cart_ppu_map(addr);
@@ -318,6 +337,11 @@ void ppu_write(u8 data, u16 addr)
 // *** DEBUG TOOLS ***
 void mem_dump()
 {
+#ifdef DEBUG
+    if (!is_init) {
+        WARNING("Not Initialized!\n");
+    }
+#endif
     // dump iram
     FILE *ofile = fopen("iram.dump", "wb");
     if (ofile == NULL) {

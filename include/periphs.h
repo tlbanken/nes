@@ -35,7 +35,7 @@ enum nes_keycode {
 	KEY_FRAME_STEP,
 };
 
-void periphs_init();
+void periphs_init(const char *title);
 void periphs_free();
 void periphs_refresh();
 enum nes_keycode periphs_poll();

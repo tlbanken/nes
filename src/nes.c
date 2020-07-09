@@ -9,6 +9,7 @@
 
 #include <signal.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <utils.h>
 #include <mem.h>
@@ -20,13 +21,13 @@
 static void sighandler(int sig)
 {
     if (sig == SIGSEGV) {
-        fprintf(stderr, "SEG FAULT!\n");
+        fprintf(stderr, "SIGSEGV (seg fault) caught!\n");
     }
     if (sig == SIGINT) {
         fprintf(stderr, "SIGINT caught!\n");
     }
     if (sig == SIGABRT) {
-        fprintf(stderr, "SIGABORT (caught)!\n");
+        fprintf(stderr, "SIGABORT caught!\n");
     }
     EXIT(1);
 }
@@ -105,11 +106,13 @@ int main(int argc, char **argv)
     // neslog_add(LID_PPU, NULL);
 
     // init hw
-    cart_load(rompath);
+    mem_init();
+    cart_init(rompath);
     cpu_init();
     ppu_init();
-    periphs_init();
-    mem_set_mirror_mode(cart_get_mirror_mode());
+    char title[64] = "NES - ";
+    strncat(title, rompath, 64);
+    periphs_init(title);
 
     // TODO do the nes stuff here
     run();

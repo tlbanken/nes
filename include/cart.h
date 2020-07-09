@@ -18,7 +18,7 @@ enum mirror_mode {
 	MIR_4SCRN = 2
 };
 
-void cart_load(const char *path);
+void cart_init(const char *path);
 u16 cart_cpu_map(u16 addr);
 u16 cart_ppu_map(u16 addr);
 enum mirror_mode cart_get_mirror_mode();

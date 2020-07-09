@@ -13,6 +13,7 @@
 #include <cpu.h>
 
 #define LOG(fmt, ...) neslog(LID_PPU, fmt, ##__VA_ARGS__);
+#define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
 
 // Object Attrubute Memory
 static u8 oam[256] = {0};
@@ -92,6 +93,7 @@ static loopyreg_t ppuaddr_tmp;
 static u8 fine_x;
 static bool al_first_write = true;
 static u8 ppudata_buf;
+static bool is_init = false;
 
 // screen state
 #define NUM_CYCLES 341
@@ -327,10 +329,14 @@ void ppu_init()
     nx_bgtile_attr = 0;
 
     clear_screen();
+    is_init = true;
 }
 
 bool ppu_step(int clock_budget)
 {
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     bool frame_finished = false;
     // run as many cycles as the budget allows
     for (int clocks = 0; clocks < clock_budget; clocks++) {
@@ -447,6 +453,9 @@ bool ppu_step(int clock_budget)
 
 u8 ppu_reg_read(u16 reg)
 {
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     u8 data = 0;
     switch (reg) {
     case 0: // PPUCTRL
@@ -504,6 +513,9 @@ u8 ppu_reg_read(u16 reg)
 
 void ppu_reg_write(u8 val, u16 reg)
 {
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     switch (reg) {
     case 0: // PPUCTRL
         ppuctrl.raw = val;
@@ -557,6 +569,9 @@ void ppu_reg_write(u8 val, u16 reg)
 // load 256 bytes from $XX00-$XXFF where XX = hi into oam
 void ppu_oamdma(u8 hi)
 {
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     for (u16 lo = 0; lo < 256; lo++) {
         u16 addr = ((u16)hi) << 8;
         addr |= lo;
@@ -568,6 +583,11 @@ void ppu_oamdma(u8 hi)
 
 void ppu_dump()
 {
+#ifdef DEBUG
+    if (!is_init) {
+        WARNING("Not Initialized!\n");
+    }
+#endif
     FILE *ofile = fopen("ppu.dump", "w");
     if (ofile == NULL) {
         perror("fopen");

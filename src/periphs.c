@@ -56,9 +56,8 @@ static enum nes_keycode sdl_to_nes_key(SDL_Keycode keycode)
     }
 }
 
-void periphs_init()
+void periphs_init(const char *title)
 {
-    char title[] = "WORK IN PROGRESS";
     pxscale = 4;
 
     int rc;

@@ -12,6 +12,8 @@
 #include <cart.h>
 #include <mem.h>
 
+#define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
+
 #define INES_HEADER_SIZE 16
 
 // iNES as describe from nes dev
@@ -107,9 +109,10 @@ static u16 ppu_map000(u16 addr)
     return addr;
 }
 // *** END Mappers ***
-
-void cart_load(const char *path)
+static bool is_init = false;
+void cart_init(const char *path)
 {
+    is_init = true;
     FILE *romfile = fopen(path, "rb");
     if (romfile == NULL) {
         perror("fopen");
@@ -149,6 +152,9 @@ void cart_load(const char *path)
 
 u16 cart_cpu_map(u16 addr)
 {
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     switch (inesh.mapper_num) {
     case 0:
         return cpu_map000(addr);
@@ -163,6 +169,9 @@ u16 cart_cpu_map(u16 addr)
 
 u16 cart_ppu_map(u16 addr)
 {
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     switch (inesh.mapper_num) {
     case 0:
         return ppu_map000(addr);
@@ -175,8 +184,11 @@ u16 cart_ppu_map(u16 addr)
     return 0;
 }
 
-enum mirror_mode cart_get_mirror_mode()
+inline enum mirror_mode cart_get_mirror_mode()
 {
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     // first check if four screen mode on
     if (inesh.flags.fourscreen_mir) {
         return MIR_4SCRN;
@@ -194,6 +206,11 @@ enum mirror_mode cart_get_mirror_mode()
 
 void cart_dump()
 {
+#ifdef DEBUG
+    if (!is_init) {
+        WARNING("Not Initialized!\n");
+    }
+#endif
     // dump iNES header read
     FILE *ofile = fopen("ines.dump", "w");
     if (ofile == NULL) {
