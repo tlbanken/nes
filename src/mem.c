@@ -13,6 +13,7 @@
 #include <utils.h>
 #include <cart.h>
 #include <ppu.h>
+#include <periphs.h>
 
 #define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
 
@@ -53,6 +54,10 @@ enum cpu_memmap {
 };
 static u8 iram[MC_IRAM_SIZE] = {0};
 static u8 cartmem[MC_CART_SIZE] = {0};
+static u8 ctrl1_buf;
+static u8 ctrl1_reads;
+static u8 ctrl2_buf;
+static u8 ctrl2_reads;
 
 u8 cpu_read(u16 addr)
 {
@@ -70,12 +75,37 @@ u8 cpu_read(u16 addr)
         addr = addr - MC_PPU_START;
         addr = addr % 8;
         return ppu_reg_read(addr);
-   }
+    }
 
     // apu/io reads
     if (addr >= MC_APU_IO_START && addr <= MC_APU_IO_END) {
         // TODO read the correct apu/io reg
-        WARNING("APU/IO regs not available ($%04X)\n", addr);
+        u16 res;
+        switch (addr) {
+        case 0x4016: // Controller 1
+            // official nes controller returns 1 when report is over
+            if (ctrl2_reads == 8) {
+                return 0x41;
+            }
+            // return next in report
+            res = (ctrl1_buf >> ctrl1_reads) & 0x1;
+            ctrl1_reads++;
+            return res | 0x40; // upper bits same as addr
+            break;
+        case 0x4017: // Controller 2
+            // official nes controller returns 1 when report is over
+            if (ctrl2_reads == 8) {
+                return 0x41;
+            }
+            // return next in report
+            res = (ctrl2_buf >> ctrl2_reads) & 0x1;
+            ctrl2_reads++;
+            return res | 0x40; // upper bits same as addr
+            break;
+        default:
+            WARNING("APU/IO reg not available ($%04X)\n", addr);
+            break;
+        }
         // EXIT(1);
         return 0;
     }
@@ -123,12 +153,27 @@ void cpu_write(u8 data, u16 addr)
 
     // apu/io access
     if (addr >= MC_APU_IO_START && addr <= MC_APU_IO_END) {
-        if (addr == 0x4014) { // OAMDMA
-            ppu_oamdma(data);
-            return;
-        }
         // TODO read the correct apu/io reg
-        WARNING("APU/IO regs not available ($%04X)\n", addr);
+        switch (addr) {
+        case 0x4014:
+            ppu_oamdma(data);
+            break;
+        case 0x4016: // Controller 1
+            if (data & 0x1) {
+                ctrl1_buf = periphs_poll() & 0xFF;
+                ctrl1_reads = 0;
+            }
+            break;
+        case 0x4017: // Controller 2
+            if (data & 0x1) {
+                ctrl2_buf = periphs_poll() & 0xFF;
+                ctrl2_reads = 0;
+            }
+            break;
+        default:
+            WARNING("APU/IO reg not available ($%04X)\n", addr);
+            break;
+        }
         // EXIT(1);
         return;
     }

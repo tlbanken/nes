@@ -13,52 +13,68 @@
 #define RES_X 256
 #define RES_Y 240
 
+#define STICKY_LIMIT 50
+
 static int pxscale;
 static SDL_Window *window;
 static SDL_Renderer *renderer;
+static u16 keystate;
+static u32 stickycount;
 
 static int scale(int val)
 {
     return val * pxscale;
 }
 
-static enum nes_keycode sdl_to_nes_key(SDL_Keycode keycode)
+static void sdl_to_nes_key(SDL_Keycode keycode)
 {
     switch (keycode) {
     // Game pad keys
     case SDLK_j:
-        return KEY_A;
+        keystate |= KEY_A;
+        break;
     case SDLK_k:
-        return KEY_B;
+        keystate |= KEY_B;
+        break;
     case SDLK_w:
-        return KEY_UP;
+        keystate |= KEY_UP;
+        break;
     case SDLK_s:
-        return KEY_DOWN;
+        keystate |= KEY_DOWN;
+        break;
     case SDLK_d:
-        return KEY_RIGHT;
+        keystate |= KEY_RIGHT;
+        break;
     case SDLK_a:
-        return KEY_LEFT;
+        keystate |= KEY_LEFT;
+        break;
     case SDLK_RETURN:
-        return KEY_START;
+        keystate |= KEY_START;
+        break;
     case SDLK_BACKSPACE:
-        return KEY_SELECT;
+        keystate |= KEY_SELECT;
+        break;
     // Debug tools
     case SDLK_n:
-        return KEY_STEP;
+        keystate |= KEY_STEP;
+        break;
     case SDLK_p:
-        return KEY_PAUSE;
+        keystate |= KEY_PAUSE;
+        break;
     case SDLK_c:
-        return KEY_CONTINUE;
+        keystate |= KEY_CONTINUE;
+        break;
     case SDLK_f:
-        return KEY_FRAME_STEP;
-    default:
-        return KEY_NONE;
+        keystate |= KEY_FRAME_MODE;
+        break;
     }
 }
 
 void periphs_init(const char *title)
 {
     pxscale = 4;
+    stickycount = 0;
+    keystate = 0;
 
     int rc;
     // init sdl
@@ -93,8 +109,16 @@ void periphs_free()
     SDL_Quit();
 }
 
-enum nes_keycode periphs_poll()
+u16 periphs_poll()
 {
+    // crude sticky keys impl
+    if (stickycount >= STICKY_LIMIT) {
+        stickycount = 0;
+        keystate = 0;
+    } else {
+        stickycount++;
+    }
+
     SDL_Event e;
     SDL_Keycode keycode;
     if (SDL_PollEvent(&e)) {
@@ -104,10 +128,10 @@ enum nes_keycode periphs_poll()
             break;
         case SDL_KEYDOWN:
             keycode = e.key.keysym.sym;
-            return sdl_to_nes_key(keycode);
+            sdl_to_nes_key(keycode);
         }
     }
-    return KEY_NONE;
+    return keystate;
 }
 
 void periphs_refresh()

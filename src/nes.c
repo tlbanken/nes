@@ -54,22 +54,22 @@ static void run()
     bool frame_mode = false;
     bool frame_finished = false;
     while (true) {
-        enum nes_keycode kc = periphs_poll();
-        if (kc == KEY_PAUSE) {
+        u16 kc = periphs_poll();
+        if (kc & KEY_PAUSE) {
             paused = true;
-        } else if (kc == KEY_CONTINUE) {
+        } else if (kc & KEY_CONTINUE) {
             paused = false;
             frame_mode = false;
-        } else if (kc == KEY_FRAME_STEP) {
+        } else if (kc & KEY_FRAME_MODE) {
             frame_mode = true;
             paused = true;
         }
 
-        if (!paused || kc == KEY_STEP || (frame_mode && !frame_finished)) {
+        if (!paused || (kc & KEY_STEP) || (frame_mode && !frame_finished)) {
             cycles = cpu_step();
             frame_finished = ppu_step(3 * cycles);
             rounds++;
-            if (rounds % 50 == 0 || kc == KEY_STEP) {
+            if (rounds % 50 == 0 || (kc & KEY_STEP)) {
                 periphs_refresh();
             }
         }

@@ -130,7 +130,7 @@ void cart_init(const char *path)
     prgrom_size = inesh.prgrom_size * (16*1024);
     assert(prgrom_size != 0);
     chrrom_size = inesh.chrrom_size * (8*1024);
-    assert(chrrom_size != 0);
+    // assert(chrrom_size != 0);
 
     // write out prg rom
     u8 prgrom_buf[prgrom_size];

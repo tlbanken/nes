@@ -19,26 +19,25 @@ typedef struct nes_color {
 } nes_color_t;
 
 enum nes_keycode {
-	KEY_NONE,
-	KEY_UP,
-	KEY_DOWN,
-	KEY_LEFT,
-	KEY_RIGHT,
-	KEY_A,
-	KEY_B,
-	KEY_START,
-	KEY_SELECT,
+	KEY_A          = (1 << 0),
+	KEY_B          = (1 << 1),
+	KEY_SELECT     = (1 << 2),
+	KEY_START	   = (1 << 3),
+	KEY_UP 		   = (1 << 4),
+	KEY_DOWN       = (1 << 5),
+	KEY_LEFT       = (1 << 6),
+	KEY_RIGHT      = (1 << 7),
 	// DEBUG
-	KEY_PAUSE,
-	KEY_STEP,
-	KEY_CONTINUE,
-	KEY_FRAME_STEP,
+	KEY_PAUSE      = (1 << 8),
+	KEY_STEP       = (1 << 9),
+	KEY_CONTINUE   = (1 << 10),
+	KEY_FRAME_MODE = (1 << 11),
 };
 
 void periphs_init(const char *title);
 void periphs_free();
 void periphs_refresh();
-enum nes_keycode periphs_poll();
+u16 periphs_poll();
 void set_px(int x, int y, nes_color_t color);
 void clear_screen();
 
