@@ -32,10 +32,6 @@ $(TARGET): $(OBJ)
 $(SDIR)/%.o: $(SDIR)/%.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c $< $(LIBS) -o $@
 
-# cartridges src
-$(SDIR)/carts/%.o: $(SDIR)/carts/%.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -c $< $(LIBS) -o $@
-
 .PHONY: clean
 clean:
 	rm -f $(TARGET) $(OBJ) *.dump *.log

@@ -91,8 +91,9 @@ u8 cpu_read(u16 addr)
             res = (ctrl1_buf >> ctrl1_reads) & 0x1;
             ctrl1_reads++;
             return res | 0x40; // upper bits same as addr
-            break;
         case 0x4017: // Controller 2
+            // NOTE: For now, ignore controller 2
+            return 0x41;
             // official nes controller returns 1 when report is over
             if (ctrl2_reads == 8) {
                 return 0x41;
@@ -101,7 +102,6 @@ u8 cpu_read(u16 addr)
             res = (ctrl2_buf >> ctrl2_reads) & 0x1;
             ctrl2_reads++;
             return res | 0x40; // upper bits same as addr
-            break;
         default:
             WARNING("APU/IO reg not available ($%04X)\n", addr);
             break;

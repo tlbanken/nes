@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <SDL.h>
 
 #include <utils.h>
 #include <mem.h>
@@ -61,7 +62,7 @@ static void run()
             paused = false;
             frame_mode = false;
         } else if (kc & KEY_FRAME_MODE) {
-            frame_mode = true;
+            frame_mode = !frame_mode;
             paused = true;
         }
 
@@ -69,7 +70,7 @@ static void run()
             cycles = cpu_step();
             frame_finished = ppu_step(3 * cycles);
             rounds++;
-            if (rounds % 50 == 0 || (kc & KEY_STEP)) {
+            if (rounds % 300 == 0 || (kc & KEY_STEP)) {
                 periphs_refresh();
             }
         }
@@ -102,6 +103,7 @@ int main(int argc, char **argv)
 
     neslog_init();
     // neslog_add(LID_CPU, "cpu.log");
+    neslog_add(LID_CPU, NULL);
     // neslog_add(LID_PPU, "ppu.log");
     // neslog_add(LID_PPU, NULL);
 

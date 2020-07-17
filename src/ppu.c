@@ -15,8 +15,29 @@
 #define LOG(fmt, ...) neslog(LID_PPU, fmt, ##__VA_ARGS__);
 #define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
 
-// Object Attrubute Memory
+// Object Attrubute Memory (sprites)
 static u8 oam[256] = {0};
+// Sprite Struct
+typedef struct sprite {
+    u8 ypos;
+    u8 xpos;
+    // 8x8 sprites: Tile number within pattern table selected from PPUCTRL
+    // 8x16 sprites: selects pattern table from bit 0
+    struct {
+        u8 bank: 1;     // 0: $0000, 1: $1000 (only in 8x16 mode)
+        u8 tile_num: 7; // tile num for top of sprite (bottom half gets next tile)
+    } index;
+    // Attributes
+    struct {
+        u8 palette: 2;  // palette for the sprite 
+        u8 unused: 3;
+        u8 priority: 1; // 0: in front of background, 1: behind
+        u8 flip_h: 1;   // 0: no flip, 1: flip
+        u8 flip_v: 1;   // 0: no flip, 1: flip
+    } attr;
+} sprite_t;
+// Secondary OAM (holds 8 sprites)
+static u8 oambuf[8*4];
 
 typedef struct oam_entry {
     u8 y;    // sprite y-coordinate
@@ -102,16 +123,21 @@ static int cycle;
 static int scanline;
 static bool oddframe = false;
 
-// shifters
-u16 bgshifter_ptrn_lo;
-u16 bgshifter_ptrn_hi;
-u16 bgshifter_attr_lo;
-u16 bgshifter_attr_hi;
+// bg shifters
+static u16 bgshifter_ptrn_lo;
+static u16 bgshifter_ptrn_hi;
+static u16 bgshifter_attr_lo;
+static u16 bgshifter_attr_hi;
+
+// sprite shifters
+static u8 sprite_shifters[8];
+static u8 sprite_attrs[8];
+static u8 sprite_counters[8];
 
 // tile buffers
-u8 nx_bgtile_id;
-u16 nx_bgtile;
-u8 nx_bgtile_attr;
+static u8 nx_bgtile_id;
+static u16 nx_bgtile;
+static u8 nx_bgtile_attr;
 
 // All of the NES Colors
 static nes_color_t nes_colors[] = 
@@ -185,10 +211,9 @@ static nes_color_t nes_colors[] =
     /*0x3f -> */{0x00, 0x00, 0x00}
 };
 
-static inline bool in_render_zone()
+static inline bool in_visible_scanlines()
 {
-    return ((cycle >= 1 && cycle <= 257) || (cycle >= 321 && cycle <= 340))
-        && ((scanline >= 0 || scanline <= 239) || scanline == 261);
+    return scanline < 240 || scanline == 261;
 }
 
 static void render_px()
@@ -295,6 +320,103 @@ static void load_bgshifters()
     bgshifter_attr_hi = (bgshifter_attr_hi & 0xFF00) | (nx_bgtile_attr & 0x2 ? 0xFF : 0x00);
 }
 
+// Occurs on cycles 257-320
+static void sprite_fetch()
+{
+    switch ((cycle - 257) % 8) {
+    case 0:
+        // read y coord from OAM buf
+        break;
+    case 1:
+        // read tile num from OAM buf
+        break;
+    case 2:
+        // read attr from OAM buf
+        break;
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+        // read x coord from OAM buf
+        break;
+    default:
+        ERROR("Out of sync cycle number\n");
+        EXIT(1);
+    }
+}
+
+// https://wiki.nesdev.com/w/index.php/PPU_sprite_evaluation
+// Occurs on cycles 65-256
+static void sprite_evaluation()
+{
+    static bool oambuf_full = false;
+    static u32 oambuf_index = 0;
+    static u32 oam_index = 0;
+    static u8 buffer = 0;
+    static bool sprite_found = false;
+
+    // check if rendering is on
+    if (!ppumask.field.render_bg && !ppumask.field.render_sprites) {
+        return;
+    }
+
+    // reset
+    if (cycle == 65) {
+        oam_index = 0;
+        oambuf_index = 0;
+        oambuf_full = false;
+        sprite_found = false;
+        buffer = 0;
+    }
+
+    if (oambuf_full) {
+        return;
+    }
+
+    // Odd Cycles: Read from OAM
+    // Even Cycles: Write to OAM Buffer
+    if (cycle % 2 == 1) {
+        buffer = oam[oam_index];
+        // last read
+        if (oam_index % 4 == 3) {
+            oambuf[oambuf_index] = buffer;
+            oambuf_index++;
+            sprite_found = false;
+        }
+        // read y coord
+        if (oam_index % 4 == 0) {
+            // check if sprite belongs on this scanline
+            if (buffer == scanline) {
+                ppustatus.field.sprite_overflow = 1;
+                sprite_found = true;
+            } else {
+                // skip sprite
+                oam_index += 3;
+                // due to bug increment again
+                oam_index++;
+            }
+        } 
+        oam_index++;
+    } else {
+        if (sprite_found) {
+            // set sprite overflow flag?
+            oambuf[oambuf_index] = buffer;
+            oambuf_index++;
+        }
+    }
+
+    // handle overflows
+    if (oambuf_index >= 32) {
+        oambuf_index = 0;
+        oambuf_full = true;
+    }
+    if (oam_index >= 256) {
+        oam_index = 0;
+        // TODO
+    }
+}
+
 void ppu_init()
 {
     // sanity check union-struct hacks
@@ -340,19 +462,20 @@ bool ppu_step(int clock_budget)
     bool frame_finished = false;
     // run as many cycles as the budget allows
     for (int clocks = 0; clocks < clock_budget; clocks++) {
+        if (!in_visible_scanlines()) {
+            goto post_visible_scanlines;
+        }
+
         // free cycle on oddframe
         if (cycle == 0 && oddframe && scanline == 0) {
             cycle = 1;
         }
-        LOG("CY:%03u SL:%03u OD:%u    C:%02X M:%02X S:%02X V:%04X T:%04X    RENDER: %u\n",
-            cycle, scanline, oddframe, ppuctrl.raw, ppumask.raw, ppustatus.raw,
-            ppuaddr.raw, ppuaddr_tmp.raw, in_render_zone());
 
-        // if (scanline == 0) {
-        //     ppuaddr = ppuaddr_tmp;
-        // }
+        // LOG("CY:%03u SL:%03u OD:%u    C:%02X M:%02X S:%02X V:%04X T:%04X    RENDER: %u\n",
+        //     cycle, scanline, oddframe, ppuctrl.raw, ppumask.raw, ppustatus.raw,
+        //     ppuaddr.raw, ppuaddr_tmp.raw, in_visible_scanlines());
 
-        if (in_render_zone()) {
+        if ((cycle >= 1 && cycle <= 257) || (cycle >= 321 && cycle <= 340)) {
             // update the shifter registers
             shift_bgshifters();
             
@@ -408,16 +531,28 @@ bool ppu_step(int clock_budget)
 
         }
 
+        if (cycle >= 1 && cycle <= 64) {
+            // TODO fill oam buffer with 0xFF
+        }
+
+        if (cycle >= 65 && cycle <= 256) {
+            sprite_evaluation();
+        }
+
+        if (cycle >= 257 && cycle <= 320) {
+            sprite_fetch();
+        }
+
         if (cycle == 1 && scanline == 261) {
             ppustatus.field.vblank = 0;
             // TODO sprite 0 stuff, overflow...
         }
 
-        if (cycle == 256 && (scanline < 240 || scanline == 261)) {
+        if (cycle == 256) {
             incr_vert();
         }
 
-        if (cycle == 257 && (scanline < 240 || scanline == 261)) {
+        if (cycle == 257) {
             load_bgshifters();
             reset_horz();
         }
@@ -429,7 +564,7 @@ bool ppu_step(int clock_budget)
         // ********************************
         // Out of visible scanline region
         // ********************************
-        
+post_visible_scanlines:
         if (cycle == 1 && scanline == 241) {
             ppustatus.field.vblank = 1;
             if (ppuctrl.field.nmi_gen) {
@@ -482,7 +617,11 @@ u8 ppu_reg_read(u16 reg)
         #endif
         break;
     case 4: // OAMDATA
-        data = oam[oamaddr];
+        if (cycle >= 1 && cycle <= 64 && in_visible_scanlines()) {
+            data = 0xFF;
+        } else {
+            data = oam[oamaddr];
+        }
         break;
     case 5: // PPUSCROLL
         // no read access
