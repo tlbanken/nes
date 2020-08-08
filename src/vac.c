@@ -1,13 +1,13 @@
 /*
- * periphs.c
+ * vac.c
  *
  * Travis Banken
  * 2020
  *
- * Wrapper around frameworks for peripherals and gui.
+ * Wrapper framework for Video, Audio, and Controllers
  */
 
-#include <periphs.h>
+#include <vac.h>
 #include <SDL.h>
 
 #define RES_X 256
@@ -86,7 +86,7 @@ static void sdl_to_nes_key(SDL_Keycode keycode)
     }
 }
 
-void periphs_init(const char *title, bool debug_display)
+void Vac_Init(const char *title, bool debug_display)
 {
     pxscale = 4;
     stickycount = 0;
@@ -123,14 +123,14 @@ void periphs_init(const char *title, bool debug_display)
     }
 }
 
-void periphs_free()
+void Vac_Free()
 {
     SDL_DestroyWindow(window);
     SDL_DestroyRenderer(renderer);
     SDL_Quit();
 }
 
-u16 periphs_poll()
+u16 Vac_Poll()
 {
     // crude sticky keys impl
     if (stickycount >= STICKY_LIMIT) {
@@ -155,14 +155,14 @@ u16 periphs_poll()
     return keystate;
 }
 
-void periphs_refresh()
+void Vac_Refresh()
 {
     reset_draw_color();
     SDL_RenderPresent(renderer);
-    periphs_poll();
+    Vac_Poll();
 }
 
-void set_px(int x, int y, nes_color_t color)
+void Vac_SetPx(int x, int y, nes_color_t color)
 {
     // don't draw outside screen
     if (x >= RES_X || y >= RES_Y) {
@@ -181,7 +181,7 @@ void set_px(int x, int y, nes_color_t color)
     SDL_RenderFillRect(renderer, &rectangle);
 }
 
-void set_px_pt(int table_side, u16 x, u16 y, nes_color_t color)
+void Vac_SetPxPt(int table_side, u16 x, u16 y, nes_color_t color)
 {
     assert(x < 128 && y < 128);
     assert(debug_on);
@@ -199,12 +199,12 @@ void set_px_pt(int table_side, u16 x, u16 y, nes_color_t color)
     SDL_RenderFillRect(renderer, &rect);
 }
 
-void clear_screen()
+void Vac_ClearScreen()
 {
     SDL_RenderClear(renderer);
 }
 
-bool periphs_one_sec_passed()
+bool Vac_OneSecPassed()
 {
     static unsigned int last_ms = 0;
     unsigned int cur_ms = SDL_GetTicks();

@@ -28,7 +28,7 @@
 #define RESET_VECTOR 0xFFFC
 #define IRQ_VECTOR 0xFFFE
 
-#define LOG(fmt, ...) neslog(LID_CPU, fmt, ##__VA_ARGS__);
+#define LOG(fmt, ...) Neslog_Log(LID_CPU, fmt, ##__VA_ARGS__);
 
 // PSR bit field values
 enum psr_flags {
@@ -63,11 +63,9 @@ static cpu_state_t state;
 static cpu_state_t prev_state;
 
 static bool is_init = false;
-void cpu_init()
+void Cpu_Init()
 {
     is_init = true;
-    // set initial state to RESET state
-    cpu_reset();
 
     // setup opcode matrix
     // MSD 0
@@ -345,7 +343,7 @@ void cpu_init()
 
 }
 
-int cpu_step()
+int Cpu_Step()
 {
 #ifdef DEBUG
     CHECK_INIT
@@ -355,7 +353,7 @@ int cpu_step()
     // fetch instruction
     // low 4 bits = LSD
     // high 4 bits = MSD
-    u8 opcode = cpu_read(state.pc++);
+    u8 opcode = Mem_CpuRead(state.pc++);
     state.op = opcode;
     LOG(" %02X", state.op);
     int op_index = ((opcode >> 4) & 0xF) * 16 + (opcode & 0xF); 
@@ -370,7 +368,7 @@ int cpu_step()
 }
 
 // *** INTERRUPT GENERATORS ***
-void cpu_irq()
+void Cpu_Irq()
 {
 #ifdef DEBUG
     CHECK_INIT
@@ -383,28 +381,28 @@ void cpu_irq()
     // push pc
     u16 pc_lo = state.pc & 0x00FF;
     u16 pc_hi = (state.pc & 0xFF00) >> 8;
-    cpu_write(pc_hi, SP);
+    Mem_CpuWrite(pc_hi, SP);
     state.sp--;
-    cpu_write(pc_lo, SP);
+    Mem_CpuWrite(pc_lo, SP);
     state.sp--;
     // push psr with B1 flag
-    cpu_write(state.psr | PSR_B1, SP);
+    Mem_CpuWrite(state.psr | PSR_B1, SP);
     state.sp--;
     // side effect
     state.psr |= PSR_I;
 
     // call NMI vector
-    u16 lo = cpu_read(IRQ_VECTOR);
-    u16 hi = cpu_read(IRQ_VECTOR + 1);
+    u16 lo = Mem_CpuRead(IRQ_VECTOR);
+    u16 hi = Mem_CpuRead(IRQ_VECTOR + 1);
     state.pc = (hi << 8) | lo;
 
     // pop back state
     state.pc = (pc_hi << 8) | pc_lo;
     state.sp += 3;
-    state.psr = cpu_read(SP) & ~PSR_B1;
+    state.psr = Mem_CpuRead(SP) & ~PSR_B1;
 }
 
-void cpu_nmi()
+void Cpu_Nmi()
 {
 #ifdef DEBUG
     CHECK_INIT
@@ -412,35 +410,35 @@ void cpu_nmi()
     // push pc
     u16 pc_lo = state.pc & 0x00FF;
     u16 pc_hi = (state.pc & 0xFF00) >> 8;
-    cpu_write(pc_hi, SP);
+    Mem_CpuWrite(pc_hi, SP);
     state.sp--;
-    cpu_write(pc_lo, SP);
+    Mem_CpuWrite(pc_lo, SP);
     state.sp--;
     // push psr with B1 flag
-    cpu_write(state.psr | PSR_B1, SP);
+    Mem_CpuWrite(state.psr | PSR_B1, SP);
     state.sp--;
     // side effect
     state.psr |= PSR_I;
 
     // call NMI vector
-    u16 lo = cpu_read(NMI_VECTOR);
-    u16 hi = cpu_read(NMI_VECTOR + 1);
+    u16 lo = Mem_CpuRead(NMI_VECTOR);
+    u16 hi = Mem_CpuRead(NMI_VECTOR + 1);
     state.pc = (hi << 8) | lo;
 
     // pop back state
     state.pc = (pc_hi << 8) | pc_lo;
     state.sp += 3;
-    state.psr = cpu_read(SP) & ~PSR_B1;
+    state.psr = Mem_CpuRead(SP) & ~PSR_B1;
 }
 
 // initial values according to http://wiki.nesdev.com/w/index.php/CPU_power_up_state
-void cpu_reset()
+void Cpu_Reset()
 {
 #ifdef DEBUG
     CHECK_INIT
 #endif
-    u16 lo = cpu_read(RESET_VECTOR);
-    u16 hi = cpu_read(RESET_VECTOR + 1);
+    u16 lo = Mem_CpuRead(RESET_VECTOR);
+    u16 hi = Mem_CpuRead(RESET_VECTOR + 1);
     state.pc = (hi << 8) | lo;
     // state.pc = 0xC000; // NOTE: FOR TESTING
     state.sp = 0xFF;
@@ -477,21 +475,21 @@ static void mode_acc(u8 *fetch)
 static void mode_imm(u8 *fetch)
 {
     assert(fetch != NULL);
-    *fetch = cpu_read(state.pc++);
+    *fetch = Mem_CpuRead(state.pc++);
     LOG(" %02X   ", *fetch);
     LOG(" %4s #$%02X                           ", op_to_str(state.op), *fetch);
 }
 
 static void mode_abs(u8 *fetch, u16 *from)
 {
-    u16 lo = cpu_read(state.pc++);
-    u16 hi = cpu_read(state.pc++);
+    u16 lo = Mem_CpuRead(state.pc++);
+    u16 hi = Mem_CpuRead(state.pc++);
     LOG(" %02X %02X", lo, hi);
     u16 addr = (hi << 8) | lo;
 
     LOG(" %4s $%04X", op_to_str(state.op), addr);
     if (fetch != NULL) {
-        *fetch = cpu_read(addr);
+        *fetch = Mem_CpuRead(addr);
         LOG(" = %02X                     ", *fetch);
     } else {
         LOG("                          ");
@@ -504,12 +502,12 @@ static void mode_abs(u8 *fetch, u16 *from)
 
 static void mode_zp(u8 *fetch, u16 *from)
 {
-    u16 zaddr = cpu_read(state.pc++);
+    u16 zaddr = Mem_CpuRead(state.pc++);
     LOG(" %02X   ", zaddr);
 
     LOG(" %4s $%02X", op_to_str(state.op), zaddr);
     if (fetch != NULL) {
-        *fetch = cpu_read(zaddr);
+        *fetch = Mem_CpuRead(zaddr);
         LOG(" = %02X                       ", *fetch);
     } else {
         LOG("                            ");
@@ -522,13 +520,13 @@ static void mode_zp(u8 *fetch, u16 *from)
 
 static void mode_zpx(u8 *fetch, u16 *from)
 {
-    u16 zaddr = cpu_read(state.pc++);
+    u16 zaddr = Mem_CpuRead(state.pc++);
     LOG(" %02X   ", zaddr);
 
     u16 addr = (zaddr + state.x) & 0xFF;
     LOG(" %4s $%02X,X @ %02X", op_to_str(state.op), zaddr, addr);
     if (fetch != NULL) {
-        *fetch = cpu_read(addr);
+        *fetch = Mem_CpuRead(addr);
         LOG(" = %02X                ", *fetch);
     } else {
         LOG("                     ");
@@ -541,13 +539,13 @@ static void mode_zpx(u8 *fetch, u16 *from)
 
 static void mode_zpy(u8 *fetch, u16 *from)
 {
-    u16 zaddr = cpu_read(state.pc++);
+    u16 zaddr = Mem_CpuRead(state.pc++);
     LOG(" %02X   ", zaddr);
 
     u16 addr = (zaddr + state.y) & 0xFF;
     LOG(" %4s $%02X,Y @ %02X", op_to_str(state.op), zaddr, addr);
     if (fetch != NULL) {
-        *fetch = cpu_read(addr);
+        *fetch = Mem_CpuRead(addr);
         LOG(" = %02X                ", *fetch);
     } else {
         LOG("                     ");
@@ -560,15 +558,15 @@ static void mode_zpy(u8 *fetch, u16 *from)
 
 static int mode_absx(u8 *fetch, u16 *from)
 {
-    u16 lo = cpu_read(state.pc++);
-    u16 hi = cpu_read(state.pc++);
+    u16 lo = Mem_CpuRead(state.pc++);
+    u16 hi = Mem_CpuRead(state.pc++);
     u16 addr = (hi << 8) | lo;
     LOG(" %02X %02X", lo, hi);
 
     u16 xaddr = (addr + state.x);
     LOG(" %4s $%04X,X @ %04X", op_to_str(state.op), addr, xaddr);
     if (fetch != NULL) {
-        *fetch = cpu_read(xaddr);
+        *fetch = Mem_CpuRead(xaddr);
         LOG(" = %02X            ", *fetch);
     } else {
         LOG("                 ");
@@ -583,15 +581,15 @@ static int mode_absx(u8 *fetch, u16 *from)
 
 static int mode_absy(u8 *fetch, u16 *from)
 {
-    u16 lo = cpu_read(state.pc++);
-    u16 hi = cpu_read(state.pc++);
+    u16 lo = Mem_CpuRead(state.pc++);
+    u16 hi = Mem_CpuRead(state.pc++);
     u16 addr = (hi << 8) | lo;
     LOG(" %02X %02X", lo, hi);
 
     u16 yaddr = (addr + state.y);
     LOG(" %4s $%04X,Y @ %04X", op_to_str(state.op), addr, yaddr);
     if (fetch != NULL) {
-        *fetch = cpu_read(yaddr);
+        *fetch = Mem_CpuRead(yaddr);
         LOG(" = %02X            ", *fetch);
     } else {
         LOG("                 ");
@@ -614,7 +612,7 @@ static void mode_imp()
 static int mode_rel(u16 *fetch)
 {
     assert(fetch != NULL);
-    u16 rel = cpu_read(state.pc++);
+    u16 rel = Mem_CpuRead(state.pc++);
     LOG(" %02X   ", rel);
 
     // turn rel into a signed number
@@ -628,17 +626,17 @@ static int mode_rel(u16 *fetch)
 
 static void mode_indx(u8 *fetch, u16 *from)
 {
-    u16 a = cpu_read(state.pc++);
+    u16 a = Mem_CpuRead(state.pc++);
     u16 ind_addr = (a + state.x) & 0xFF;
     LOG(" %02X   ", a);
 
-    u16 lo = cpu_read(ind_addr);
-    u16 hi = cpu_read((ind_addr + 1) & 0xFF);
+    u16 lo = Mem_CpuRead(ind_addr);
+    u16 hi = Mem_CpuRead((ind_addr + 1) & 0xFF);
     u16 addr = (hi << 8) | lo;
 
     LOG(" %4s ($%02X,X) @ %02X = %04X", op_to_str(state.op), a, ind_addr, addr);
     if (fetch != NULL) {
-        *fetch = cpu_read(addr);
+        *fetch = Mem_CpuRead(addr);
         LOG(" = %02X       ", *fetch);
     } else {
         LOG("            ");
@@ -651,18 +649,18 @@ static void mode_indx(u8 *fetch, u16 *from)
 
 static int mode_indy(u8 *fetch, u16 *from)
 {
-    u16 ind_addr = cpu_read(state.pc++);
+    u16 ind_addr = Mem_CpuRead(state.pc++);
     LOG(" %02X   ", ind_addr);
 
-    u16 lo = cpu_read(ind_addr);
-    u16 hi = cpu_read((ind_addr + 1) & 0xFF);
+    u16 lo = Mem_CpuRead(ind_addr);
+    u16 hi = Mem_CpuRead((ind_addr + 1) & 0xFF);
 
     u16 addr = (hi << 8) | lo;
     u16 yaddr = addr + state.y;
 
     LOG(" %4s (%02X,Y) = %04X @ %04X", op_to_str(state.op), ind_addr, addr, yaddr);
     if (fetch != NULL) {
-        *fetch = cpu_read(yaddr);
+        *fetch = Mem_CpuRead(yaddr);
         LOG(" = %02X      ", *fetch);
     } else {
         LOG("           ");
@@ -677,19 +675,19 @@ static int mode_indy(u8 *fetch, u16 *from)
 static void mode_ind(u16 *fetch)
 {
     assert(fetch != NULL);
-    u16 ind_lo = cpu_read(state.pc++);
-    u16 ind_hi = cpu_read(state.pc++);
+    u16 ind_lo = Mem_CpuRead(state.pc++);
+    u16 ind_hi = Mem_CpuRead(state.pc++);
     LOG(" %02X %02X", ind_lo, ind_hi);
 
     u16 ind_addr = (ind_hi << 8) | ind_lo;
-    u16 lo = cpu_read(ind_addr);
+    u16 lo = Mem_CpuRead(ind_addr);
     u16 hi;
     // The 6502 has a bug when the indirect vector falls on a page boundary, the
     // MSB is fetched from $xx00 instead of ($xxFF + 1). aka it wraps around.
     if (ind_lo == 0xFF) {
-        hi = cpu_read(ind_addr & 0xFF00);
+        hi = Mem_CpuRead(ind_addr & 0xFF00);
     } else {
-        hi = cpu_read(ind_addr + 1);
+        hi = Mem_CpuRead(ind_addr + 1);
     }
 
     *fetch = (hi << 8) | lo;
@@ -869,7 +867,7 @@ static int asl()
     // shift left
     u16 res = val << 1;
     if (inmem) {
-        cpu_write(res & 0xFF, from);
+        Mem_CpuWrite(res & 0xFF, from);
     } else {
         state.acc = res & 0xFF;
     }
@@ -1044,21 +1042,21 @@ static int brk()
     // push pc
     u8 hi = state.pc >> 8;
     u8 lo = state.pc & 0xFF;
-    cpu_write(hi, SP);
+    Mem_CpuWrite(hi, SP);
     state.sp--;
-    cpu_write(lo, SP);
+    Mem_CpuWrite(lo, SP);
     state.sp--;
     // push psr
     u8 psr_push = state.psr | PSR_B0 | PSR_B1;
-    cpu_write(psr_push, SP);
+    Mem_CpuWrite(psr_push, SP);
     state.sp--;
 
     // set I flag (not sure if needs to be done before stack push)
     set_flag(PSR_I, true);
 
     // set pc to IRQ interrupt vector
-    lo = cpu_read(IRQ_VECTOR);
-    hi = cpu_read(IRQ_VECTOR + 1);
+    lo = Mem_CpuRead(IRQ_VECTOR);
+    hi = Mem_CpuRead(IRQ_VECTOR + 1);
     state.pc = (hi << 8) | lo;
 
     return 7;
@@ -1331,7 +1329,7 @@ static int dec()
 
     // decrement and store
     u8 res = val - 1;
-    cpu_write(res, from);
+    Mem_CpuWrite(res, from);
 
     // set flags
     set_flag(PSR_Z, res == 0);
@@ -1468,7 +1466,7 @@ static int inc()
 
     // decrement and store
     u8 res = val + 1;
-    cpu_write(res, from);
+    Mem_CpuWrite(res, from);
 
     // set flags
     set_flag(PSR_Z, res == 0);
@@ -1554,9 +1552,9 @@ static int jsr()
     mode_abs(NULL, &target);
     // push (pc - 1) to stack
     state.pc--;
-    cpu_write(state.pc >> 8, SP);
+    Mem_CpuWrite(state.pc >> 8, SP);
     state.sp--;
-    cpu_write(state.pc & 0xFF, SP);
+    Mem_CpuWrite(state.pc & 0xFF, SP);
     state.sp--;
     // set subroutine as cur pc
     state.pc = target;
@@ -1759,7 +1757,7 @@ static int lsr()
     // shift left
     u8 res = val >> 1;
     if (inmem) {
-        cpu_write(res, from);
+        Mem_CpuWrite(res, from);
     } else {
         state.acc = res;
     }
@@ -1916,7 +1914,7 @@ static int pha()
 {
     assert(state.op == 0x48);
     mode_imp();
-    cpu_write(state.acc, SP);
+    Mem_CpuWrite(state.acc, SP);
     state.sp--;
     return 3;
 }
@@ -1932,7 +1930,7 @@ static int php()
     assert(state.op == 0x08);
     mode_imp();
     u8 stack_psr = state.psr | PSR_B0 | PSR_B1;
-    cpu_write(stack_psr, SP);
+    Mem_CpuWrite(stack_psr, SP);
     state.sp--;
     return 3;
 }
@@ -1948,7 +1946,7 @@ static int pla()
     assert(state.op == 0x68);
     mode_imp();
     state.sp++;
-    state.acc = cpu_read(SP);
+    state.acc = Mem_CpuRead(SP);
     // set flags
     set_flag(PSR_Z, state.acc == 0);
     set_flag(PSR_N, state.acc & 0x80);
@@ -1966,7 +1964,7 @@ static int plp()
     assert(state.op == 0x28);
     mode_imp();
     state.sp++;
-    state.psr = cpu_read(SP);
+    state.psr = Mem_CpuRead(SP);
     // reset fake B flags
     set_flag(PSR_B0, false);
     set_flag(PSR_B1, true);
@@ -2015,7 +2013,7 @@ static int rol()
     // rotate
     u16 res = (val << 1) | (state.psr & PSR_C);
     if (inmem) {
-        cpu_write(res & 0xFF, from);
+        Mem_CpuWrite(res & 0xFF, from);
     } else {
         state.acc = res & 0xFF;
     }
@@ -2070,7 +2068,7 @@ static int ror()
     // rotate
     u8 res = (val >> 1) | ((state.psr & PSR_C) << 7);
     if (inmem) {
-        cpu_write(res, from);
+        Mem_CpuWrite(res, from);
     } else {
         state.acc = res;
     }
@@ -2095,14 +2093,14 @@ static int rti()
     mode_imp();
     // pull psr and remove fake B flags
     state.sp++;
-    state.psr = cpu_read(SP);
+    state.psr = Mem_CpuRead(SP);
     set_flag(PSR_B0, false);
     set_flag(PSR_B1, true);
     // pull pc
     state.sp++;
-    u16 lo = cpu_read(SP);
+    u16 lo = Mem_CpuRead(SP);
     state.sp++;
-    u16 hi = cpu_read(SP);
+    u16 hi = Mem_CpuRead(SP);
     state.pc = (hi << 8) | lo;
     return 6;
 }
@@ -2119,9 +2117,9 @@ static int rts()
     mode_imp();
     // pull (pc-1)
     state.sp++;
-    u16 lo = cpu_read(SP);
+    u16 lo = Mem_CpuRead(SP);
     state.sp++;
-    u16 hi = cpu_read(SP);
+    u16 hi = Mem_CpuRead(SP);
     state.pc = (hi << 8) | lo;
     state.pc++;
     return 6;
@@ -2279,7 +2277,7 @@ static int sta()
     }
 
     // store acc
-    cpu_write(state.acc, from);
+    Mem_CpuWrite(state.acc, from);
     return clocks;
 }
 
@@ -2311,7 +2309,7 @@ static int stx()
         EXIT(1);
     }
     // store x
-    cpu_write(state.x, from);
+    Mem_CpuWrite(state.x, from);
     return clocks;
 }
 
@@ -2343,7 +2341,7 @@ static int sty()
         EXIT(1);
     }
     // store x
-    cpu_write(state.y, from);
+    Mem_CpuWrite(state.y, from);
     return clocks;
 }
 
@@ -2494,7 +2492,7 @@ static int lax()
     }
 
     // load acc then transfer to x
-    state.acc = cpu_read(from);
+    state.acc = Mem_CpuRead(from);
     state.x = state.acc;
 
     // set flags
@@ -2539,7 +2537,7 @@ static int sax()
 
     // AND X and A then store
     u8 res = state.x & state.acc;
-    cpu_write(res, target);
+    Mem_CpuWrite(res, target);
     return clocks;
 }
 
@@ -2593,7 +2591,7 @@ static int dcp()
     // DEC then CMP
     u8 dec_res = val - 1;
     u8 cmp_res = state.acc - dec_res;
-    cpu_write(dec_res, from);
+    Mem_CpuWrite(dec_res, from);
 
     // set flags
     set_flag(PSR_C, state.acc >= dec_res);
@@ -2650,7 +2648,7 @@ static int isc()
 
     // INC then SBC
     u8 inc_res = val + 1;
-    cpu_write(inc_res, from);
+    Mem_CpuWrite(inc_res, from);
     u8 neg_inc_res = ~inc_res;
     u16 sbc_res = state.acc + neg_inc_res + (state.psr & PSR_C);
     state.acc = sbc_res & 0xFF;
@@ -2711,7 +2709,7 @@ static int rla()
 
     // ROL then AND
     u8 rol_res = val << 1 | (state.psr & PSR_C);
-    cpu_write(rol_res, from);
+    Mem_CpuWrite(rol_res, from);
     state.acc &= rol_res;
 
     // set flags
@@ -2769,7 +2767,7 @@ static int rra()
 
     // ROR then ADC
     u8 ror_res = (val >> 1) | ((state.psr & PSR_C) << 7);
-    cpu_write(ror_res, from);
+    Mem_CpuWrite(ror_res, from);
     set_flag(PSR_C, val & 0x1);
     u16 adc_res = state.acc + ror_res + (state.psr & PSR_C);
     state.acc = adc_res & 0xFF;
@@ -2830,7 +2828,7 @@ static int slo()
 
     // ASL then ORA
     u8 asl_res = val << 1;
-    cpu_write(asl_res, from);
+    Mem_CpuWrite(asl_res, from);
     state.acc |= asl_res;
 
     // set flags
@@ -2888,7 +2886,7 @@ static int sre()
 
     // LSR then EOR
     u8 lsr_res = val >> 1;
-    cpu_write(lsr_res, from);
+    Mem_CpuWrite(lsr_res, from);
     state.acc ^= lsr_res;
 
     // set flags

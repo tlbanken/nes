@@ -17,7 +17,7 @@
 #include <cart.h>
 #include <cpu.h>
 #include <ppu.h>
-#include <periphs.h>
+#include <vac.h>
 
 static void sighandler(int sig)
 {
@@ -36,12 +36,12 @@ static void sighandler(int sig)
 static void exit_handler(int rc)
 {
     if (rc != OK) {
-        mem_dump();
-        cart_dump();
-        ppu_dump();
-        neslog_cleanup();
-        periphs_free();
+        Mem_Dump();
+        Cart_Dump();
+        Ppu_Dump();
     }
+    Neslog_Free();
+    Vac_Free();
 }
 
 static void run()
@@ -57,7 +57,7 @@ static void run()
     bool frame_finished = false;
     u8 pal_id = 1;
     while (true) {
-        u16 kc = periphs_poll();
+        u16 kc = Vac_Poll();
         if (kc & KEY_PAUSE) {
             paused = true;
         } else if (kc & KEY_CONTINUE) {
@@ -72,38 +72,36 @@ static void run()
             pal_id = (pal_id % 8) + 1;
         }
 
+        // execution of cpu and ppu
         if (!paused || (kc & KEY_STEP) || (frame_mode && !frame_finished)) {
-            cycles = cpu_step();
-            frame_finished = ppu_step(3 * cycles);
+            cycles = Cpu_Step();
+            // frame_finished = Ppu_Step(3 * cycles);
             // rounds++;
-            // if (rounds % 300 == 0 || (kc & KEY_STEP)) {
-            //     draw_pattern_table(0, pal_id - 1);
-            //     draw_pattern_table(1, pal_id - 1);
-            //     periphs_refresh();
-            // }
         }
 
+        // change pallete on debug display
         if (kc & KEY_PAL_CHANGE) {
-            draw_pattern_table(0, pal_id - 1);
-            draw_pattern_table(1, pal_id - 1);
-            periphs_refresh();
+            // draw_pattern_table(0, pal_id - 1);
+            // draw_pattern_table(1, pal_id - 1);
+            Vac_Refresh();
         }
 
+        // update screen on frame finish
         if (frame_finished || (kc & KEY_STEP)) {
             // debug
-            draw_pattern_table(0, pal_id - 1);
-            draw_pattern_table(1, pal_id - 1);
+            // draw_pattern_table(0, pal_id - 1);
+            // draw_pattern_table(1, pal_id - 1);
 
             frame_finished = false;
-            periphs_refresh();
-            clear_screen();
+            Vac_Refresh();
+            Vac_ClearScreen();
 
             num_frames++;
         }
 
         // TODO: Only during debug mode!
         // calc frame rate
-        if (periphs_one_sec_passed()) {
+        if (Vac_OneSecPassed()) {
             // display frame rate
             printf("%d\n", num_frames);
             num_frames = 0;
@@ -133,28 +131,30 @@ int main(int argc, char **argv)
     assert(rc == 0);
     rc = sigaction(SIGABRT, &sa, NULL);
     assert(rc == 0);
-    set_exit_handler(exit_handler);
+    Utils_SetExitHandler(exit_handler);
 
-    neslog_init();
-    // neslog_add(LID_CPU, "cpu.log");
-    // neslog_add(LID_CPU, NULL);
-    // neslog_add(LID_PPU, "ppu.log");
-    // neslog_add(LID_PPU, NULL);
+    Neslog_Init();
+    // Neslog_Add(LID_CPU, "cpu.log");
+    // Neslog_Add(LID_CPU, NULL);
+    // Neslog_Add(LID_PPU, "ppu.log");
+    // Neslog_Add(LID_PPU, NULL);
 
     // init hw
-    mem_init();
-    cart_init(rompath);
-    cpu_init();
-    ppu_init();
+    Mem_Init();
+    Cart_Init();
+    Cpu_Init();
+    // Ppu_Init();
     char title[64] = "NES - ";
     strncat(title, rompath, 64);
-    periphs_init(title, true);
+    Vac_Init(title, true);
 
-    // TODO do the nes stuff here
+    // load up the rom and start the game
+    Cart_Load(rompath);
+    Cpu_Reset();
     run();
 
-    periphs_free();
-    neslog_cleanup();
+    Vac_Free();
+    Neslog_Free();
     return 0;
 }
 

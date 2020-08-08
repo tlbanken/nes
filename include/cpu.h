@@ -10,11 +10,10 @@
 #ifndef _CPU_H
 #define _CPU_H
 
-int cpu_step();
-void cpu_reset();
-void cpu_init();
-void cpu_irq();
-void cpu_nmi();
-void cpu_reset();
+void Cpu_Init();
+int Cpu_Step();
+void Cpu_Irq();
+void Cpu_Nmi();
+void Cpu_Reset();
 
 #endif

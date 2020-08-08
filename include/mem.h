@@ -12,11 +12,11 @@
 
 #include <cart.h>
 
-void mem_init();
-void mem_dump();
-void ppu_write(u8 data, u16 addr);
-u8 ppu_read(u16 addr);
-void cpu_write(u8 data, u16 addr);
-u8 cpu_read(u16 addr);
+void Mem_Init();
+void Mem_Dump();
+void Mem_PpuWrite(u8 data, u16 addr);
+u8 Mem_PpuRead(u16 addr);
+void Mem_CpuWrite(u8 data, u16 addr);
+u8 Mem_CpuRead(u16 addr);
 
 #endif

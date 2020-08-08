@@ -13,12 +13,12 @@
 #include <utils.h>
 #include <cart.h>
 #include <ppu.h>
-#include <periphs.h>
+#include <vac.h>
 
 #define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
 
 static bool is_init = false;
-void mem_init()
+void Mem_Init()
 {
     is_init = true;
 }
@@ -59,14 +59,14 @@ static u8 ctrl1_reads;
 static u8 ctrl2_buf;
 static u8 ctrl2_reads;
 
-u8 cpu_read(u16 addr)
+u8 Mem_CpuRead(u16 addr)
 {
 #ifdef DEBUG
     CHECK_INIT;
 #endif
     // cartridge access (most likely so put this first)
     if (addr >= 0x4020) {
-        addr = cart_cpu_map(addr);
+        addr = Cart_CpuMap(addr);
         addr -= 0x4020;
         return cartmem[addr];
     }
@@ -78,10 +78,8 @@ u8 cpu_read(u16 addr)
 
     // ppu register access
     if (addr >= 0x2000 && addr <= 0x3FFF) {
-        // convert to 0-7 addr space
-        addr = addr - 0x2000;
-        addr = addr % 8;
-        return ppu_reg_read(addr);
+        // convert to 0-7 addr space and read
+        return Ppu_RegRead(addr & 0x7);
     }
 
     // apu/io reads
@@ -132,14 +130,14 @@ u8 cpu_read(u16 addr)
     return 0;
 }
 
-void cpu_write(u8 data, u16 addr)
+void Mem_CpuWrite(u8 data, u16 addr)
 {
 #ifdef DEBUG
     CHECK_INIT;
 #endif
     // cartridge access (most likely so put this first)
     if (addr >= 0x4020) {
-        addr = cart_cpu_map(addr);
+        addr = Cart_CpuMap(addr);
         addr -= 0x4020;
         cartmem[addr] = data;
         return;
@@ -153,10 +151,8 @@ void cpu_write(u8 data, u16 addr)
 
     // ppu register access
     if (addr >= 0x2000 && addr <= 0x3FFF) {
-        // convert to 0-7 addr space
-        addr = addr - MC_PPU_START;
-        addr = addr % 8;
-        ppu_reg_write(data, addr);
+        // convert to 0-7 addr space and write
+        Ppu_RegWrite(data, addr & 0x7);
         return;
     }
 
@@ -165,17 +161,17 @@ void cpu_write(u8 data, u16 addr)
         // TODO read the correct apu/io reg
         switch (addr) {
         case 0x4014:
-            ppu_oamdma(data);
+            Ppu_Oamdma(data);
             break;
         case 0x4016: // Controller 1
             if (data & 0x1) {
-                ctrl1_buf = periphs_poll() & 0xFF;
+                ctrl1_buf = Vac_Poll() & 0xFF;
                 ctrl1_reads = 0;
             }
             break;
         case 0x4017: // Controller 2
             if (data & 0x1) {
-                ctrl2_buf = periphs_poll() & 0xFF;
+                ctrl2_buf = Vac_Poll() & 0xFF;
                 ctrl2_reads = 0;
             }
             break;
@@ -256,7 +252,7 @@ static u16 mirror(u16 addr)
     assert(addr >= 0x2000);
 #endif
 
-    enum mirror_mode mirror_mode = cart_get_mirror_mode();
+    enum mirror_mode mirror_mode = Cart_GetMirrorMode();
     switch (mirror_mode) {
     case MIR_HORZ:
         if (addr >= NT_TOPL && addr < NT_TOPR) {
@@ -284,14 +280,14 @@ static u16 mirror(u16 addr)
     return addr - 0x2000;
 }
 
-u8 ppu_read(u16 addr)
+u8 Mem_PpuRead(u16 addr)
 {
 #ifdef DEBUG
     CHECK_INIT;
 #endif
     // Pattern table access
     if (addr <= 0x1FFF) {
-        addr = cart_ppu_map(addr);
+        addr = Cart_PpuMap(addr);
         return chrrom[addr];
     }
 
@@ -330,14 +326,14 @@ u8 ppu_read(u16 addr)
     return 0;
 }
 
-void ppu_write(u8 data, u16 addr)
+void Mem_PpuWrite(u8 data, u16 addr)
 {
 #ifdef DEBUG
     CHECK_INIT;
 #endif
     // Pattern table access
     if (addr <= 0x1FFF) {
-        addr = cart_ppu_map(addr);
+        addr = Cart_PpuMap(addr);
         chrrom[addr] = data;
         return;
     }
@@ -380,7 +376,7 @@ void ppu_write(u8 data, u16 addr)
 }
 
 // *** DEBUG TOOLS ***
-void mem_dump()
+void Mem_Dump()
 {
 #ifdef DEBUG
     if (!is_init) {

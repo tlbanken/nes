@@ -12,12 +12,12 @@
 
 #include <utils.h>
 
-void ppu_init();
-bool ppu_step(int clock_budget);
-u8 ppu_reg_read(u16 reg);
-void ppu_reg_write(u8 val, u16 reg);
-void ppu_oamdma(u8 hi);
-void ppu_dump();
-void draw_pattern_table(u16 table_id, u8 pal_id);
+void Ppu_Init();
+bool Ppu_Step(int clock_budget);
+u8 Ppu_RegRead(u16 reg);
+void Ppu_RegWrite(u8 val, u16 reg);
+void Ppu_Oamdma(u8 hi);
+void Ppu_Dump();
+// void draw_pattern_table(u16 table_id, u8 pal_id);
 
 #endif

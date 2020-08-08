@@ -29,12 +29,12 @@ typedef enum lid {
     LID_CART = 3,
 } lid_t;
 
-void neslog(lid_t id, const char *fmt, ...);
-void neslog_add(lid_t id, char *path);
-void neslog_init();
-void neslog_cleanup();
-void set_exit_handler(void (*func)(int));
-void exit_with_handler(int rc);
+void Neslog_Log(lid_t id, const char *fmt, ...);
+void Neslog_Add(lid_t id, char *path);
+void Neslog_Init();
+void Neslog_Free();
+void Utils_SetExitHandler(void (*func)(int));
+void Utils_ExitWithHandler(int rc);
 char* op_to_str(u8 opcode);
 
 // error codes
@@ -49,7 +49,7 @@ char* op_to_str(u8 opcode);
     fprintf(stderr, "[%s] WARNING: ", __FUNCTION__); \
     fprintf(stderr, fmt, ##__VA_ARGS__);
 
-#define EXIT(rc) exit_with_handler(rc);
+#define EXIT(rc) Utils_ExitWithHandler(rc);
 
 
 #endif

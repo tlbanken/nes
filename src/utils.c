@@ -16,12 +16,12 @@ static FILE* lmap[LMAP_SIZE] = {0};
 static bool log_on = false;
 static void (*ehandler)(int) = NULL;
 
-void neslog_init()
+void Neslog_Init()
 {
     log_on = true;
 }
 
-void neslog_cleanup()
+void Neslog_Free()
 {
     for (int id = 0; id < LMAP_SIZE; id++) {
         if (lmap[id] != NULL && lmap[id] != stdout && lmap[id] != stderr) {
@@ -31,7 +31,7 @@ void neslog_cleanup()
     }
 }
 
-void neslog_add(lid_t id, char *path)
+void Neslog_Add(lid_t id, char *path)
 {
     // default to stderr
     if (path == NULL) {
@@ -47,7 +47,7 @@ void neslog_add(lid_t id, char *path)
     lmap[id] = file;
 }
 
-void neslog(lid_t id, const char *fmt, ...)
+void Neslog_Log(lid_t id, const char *fmt, ...)
 {
     if (!log_on) {
         return;
@@ -64,12 +64,12 @@ void neslog(lid_t id, const char *fmt, ...)
     va_end(args);
 }
 
-void set_exit_handler(void (*func)(int))
+void Utils_SetExitHandler(void (*func)(int))
 {
     ehandler = func;
 }
 
-void exit_with_handler(int rc)
+void Utils_ExitWithHandler(int rc)
 {
     if (ehandler != NULL) {
         ehandler(rc);

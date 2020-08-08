@@ -108,11 +108,19 @@ static u16 ppu_map000(u16 addr)
 {
     return addr;
 }
+
 // *** END Mappers ***
 static bool is_init = false;
-void cart_init(const char *path)
+void Cart_Init(const char *path)
 {
     is_init = true;
+}
+
+void Cart_Load(const char *path)
+{
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
     FILE *romfile = fopen(path, "rb");
     if (romfile == NULL) {
         perror("fopen");
@@ -136,13 +144,13 @@ void cart_init(const char *path)
     u8 prgrom_buf[prgrom_size];
     fread(prgrom_buf, 1, prgrom_size, romfile);
     for (u32 i = 0; i < prgrom_size; i++) {
-        cpu_write(prgrom_buf[i], i + 0x8000);
+        Mem_CpuWrite(prgrom_buf[i], i + 0x8000);
     }
 
     u8 chrrom_buf[chrrom_size];
     fread(chrrom_buf, 1, chrrom_size, romfile);
     for (u32 i = 0; i < chrrom_size; i++) {
-        ppu_write(chrrom_buf[i], i);
+        Mem_PpuWrite(chrrom_buf[i], i);
     }
 
     // TODO the rare extensions
@@ -150,7 +158,7 @@ void cart_init(const char *path)
     fclose(romfile);
 }
 
-u16 cart_cpu_map(u16 addr)
+u16 Cart_CpuMap(u16 addr)
 {
 #ifdef DEBUG
     CHECK_INIT;
@@ -167,7 +175,7 @@ u16 cart_cpu_map(u16 addr)
     return 0;
 }
 
-u16 cart_ppu_map(u16 addr)
+u16 Cart_PpuMap(u16 addr)
 {
 #ifdef DEBUG
     CHECK_INIT;
@@ -184,7 +192,7 @@ u16 cart_ppu_map(u16 addr)
     return 0;
 }
 
-inline enum mirror_mode cart_get_mirror_mode()
+inline enum mirror_mode Cart_GetMirrorMode()
 {
 #ifdef DEBUG
     CHECK_INIT;
@@ -204,7 +212,7 @@ inline enum mirror_mode cart_get_mirror_mode()
     return 0;
 }
 
-void cart_dump()
+void Cart_Dump()
 {
 #ifdef DEBUG
     if (!is_init) {

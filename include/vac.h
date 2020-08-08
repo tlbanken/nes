@@ -4,11 +4,11 @@
  * Travis Banken
  * 2020
  *
- * Header for the NES Peripherals
+ * Header for the wrapper framework for Video, Audio, and Controller
  */
 
-#ifndef _PERIPHS_H
-#define _PERIPHS_H
+#ifndef _VAC_H
+#define _VAC_H
 
 #include <utils.h>
 
@@ -35,14 +35,14 @@ enum nes_keycode {
 	KEY_PAL_CHANGE = (1 << 12),
 };
 
-void periphs_init(const char *title, bool debug_display);
-void periphs_free();
-void periphs_refresh();
-u16 periphs_poll();
-void set_px(int x, int y, nes_color_t color);
-void set_px_pt(int table_side, u16 x, u16 y, nes_color_t color);
-void clear_screen();
-bool periphs_one_sec_passed();
+void Vac_Init(const char *title, bool debug_display);
+void Vac_Free();
+void Vac_Refresh();
+u16 Vac_Poll();
+void Vac_SetPx(int x, int y, nes_color_t color);
+void Vac_SetPxPt(int table_side, u16 x, u16 y, nes_color_t color);
+void Vac_ClearScreen();
+bool Vac_OneSecPassed();
 
 
 #endif
