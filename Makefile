@@ -12,9 +12,13 @@ IDIR = include
 CFLAGS = -std=c11
 CFLAGS += -I$(IDIR)
 CFLAGS += -Wall -Wextra -Wc99-c11-compat
+# all the warnings!
+CFLAGS += -Wshadow -Wdouble-promotion -Wundef -Wduplicated-cond \
+		  -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wformat=2
 CFLAGS += $(shell sdl2-config --cflags)
 # CFLAGS += -O3
 CFLAGS += -g
+# CFLAGS += -pg # for profiling
 CFLAGS += -DDEBUG
 
 LIBS = $(shell sdl2-config --libs)

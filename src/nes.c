@@ -47,13 +47,15 @@ static void exit_handler(int rc)
 static void run()
 {
     // int limit = 9000;
-    int rounds = 0;
+    // int rounds = 0;
     int cycles;
+    u32 num_frames = 0;
     // bool paused = true; // NOTE: TESTING
     bool paused = false;
     // bool frame_mode = true; // NOTE: TESTING
     bool frame_mode = false;
     bool frame_finished = false;
+    u8 pal_id = 1;
     while (true) {
         u16 kc = periphs_poll();
         if (kc & KEY_PAUSE) {
@@ -66,13 +68,45 @@ static void run()
             paused = true;
         }
 
+        if (kc & KEY_PAL_CHANGE) {
+            pal_id = (pal_id % 8) + 1;
+        }
+
         if (!paused || (kc & KEY_STEP) || (frame_mode && !frame_finished)) {
             cycles = cpu_step();
             frame_finished = ppu_step(3 * cycles);
-            rounds++;
-            if (rounds % 300 == 0 || (kc & KEY_STEP)) {
-                periphs_refresh();
-            }
+            // rounds++;
+            // if (rounds % 300 == 0 || (kc & KEY_STEP)) {
+            //     draw_pattern_table(0, pal_id - 1);
+            //     draw_pattern_table(1, pal_id - 1);
+            //     periphs_refresh();
+            // }
+        }
+
+        if (kc & KEY_PAL_CHANGE) {
+            draw_pattern_table(0, pal_id - 1);
+            draw_pattern_table(1, pal_id - 1);
+            periphs_refresh();
+        }
+
+        if (frame_finished || (kc & KEY_STEP)) {
+            // debug
+            draw_pattern_table(0, pal_id - 1);
+            draw_pattern_table(1, pal_id - 1);
+
+            frame_finished = false;
+            periphs_refresh();
+            clear_screen();
+
+            num_frames++;
+        }
+
+        // TODO: Only during debug mode!
+        // calc frame rate
+        if (periphs_one_sec_passed()) {
+            // display frame rate
+            printf("%d\n", num_frames);
+            num_frames = 0;
         }
     }
 }
@@ -103,7 +137,7 @@ int main(int argc, char **argv)
 
     neslog_init();
     // neslog_add(LID_CPU, "cpu.log");
-    neslog_add(LID_CPU, NULL);
+    // neslog_add(LID_CPU, NULL);
     // neslog_add(LID_PPU, "ppu.log");
     // neslog_add(LID_PPU, NULL);
 
@@ -114,7 +148,7 @@ int main(int argc, char **argv)
     ppu_init();
     char title[64] = "NES - ";
     strncat(title, rompath, 64);
-    periphs_init(title);
+    periphs_init(title, true);
 
     // TODO do the nes stuff here
     run();

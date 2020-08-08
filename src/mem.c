@@ -64,21 +64,28 @@ u8 cpu_read(u16 addr)
 #ifdef DEBUG
     CHECK_INIT;
 #endif
+    // cartridge access (most likely so put this first)
+    if (addr >= 0x4020) {
+        addr = cart_cpu_map(addr);
+        addr -= 0x4020;
+        return cartmem[addr];
+    }
+
     // internal ram access
-    if (addr <= MC_IRAM_END) {
-        return iram[addr % MC_IRAM_SIZE];
+    if (addr <= 0x1FFF) {
+        return iram[addr & 0x7FF];
     }
 
     // ppu register access
-    if (addr >= MC_PPU_START && addr <= MC_PPU_END) {
+    if (addr >= 0x2000 && addr <= 0x3FFF) {
         // convert to 0-7 addr space
-        addr = addr - MC_PPU_START;
+        addr = addr - 0x2000;
         addr = addr % 8;
         return ppu_reg_read(addr);
     }
 
     // apu/io reads
-    if (addr >= MC_APU_IO_START && addr <= MC_APU_IO_END) {
+    if (addr >= 0x4000 && addr <= 0x4017) {
         // TODO read the correct apu/io reg
         u16 res;
         switch (addr) {
@@ -111,19 +118,13 @@ u8 cpu_read(u16 addr)
     }
 
     // disabled apu/io reads
-    if (addr >= MC_APU_IO_TEST_START && addr <= MC_APU_IO_TEST_END) {
+    if (addr >= 0x4018 && addr <= 0x401F) {
         // TODO ???
         WARNING("APU/IO test regs not available ($%04X)\n", addr);
         // EXIT(1);
         return 0;
     }
 
-    // cartridge access
-    if (addr >= MC_CART_START) {
-        addr = cart_cpu_map(addr);
-        addr -= MC_CART_START;
-        return cartmem[addr];
-    }
 
     // Should not get here
     ERROR("Unknown cpu read request addr ($%04X)\n", addr);
@@ -136,14 +137,22 @@ void cpu_write(u8 data, u16 addr)
 #ifdef DEBUG
     CHECK_INIT;
 #endif
+    // cartridge access (most likely so put this first)
+    if (addr >= 0x4020) {
+        addr = cart_cpu_map(addr);
+        addr -= 0x4020;
+        cartmem[addr] = data;
+        return;
+    }
+
     // internal ram access
-    if (addr <= MC_IRAM_END) {
-        iram[addr % MC_IRAM_SIZE] = data;
+    if (addr <= 0x1FFF) {
+        iram[addr & 0x7FF] = data;
         return;
     }
 
     // ppu register access
-    if (addr >= MC_PPU_START && addr <= MC_PPU_END) {
+    if (addr >= 0x2000 && addr <= 0x3FFF) {
         // convert to 0-7 addr space
         addr = addr - MC_PPU_START;
         addr = addr % 8;
@@ -152,7 +161,7 @@ void cpu_write(u8 data, u16 addr)
     }
 
     // apu/io access
-    if (addr >= MC_APU_IO_START && addr <= MC_APU_IO_END) {
+    if (addr >= 0x4000 && addr <= 0x4017) {
         // TODO read the correct apu/io reg
         switch (addr) {
         case 0x4014:
@@ -178,21 +187,12 @@ void cpu_write(u8 data, u16 addr)
         return;
     }
 
-    // disabled apu/io access
-    if (addr >= MC_APU_IO_TEST_START && addr <= MC_APU_IO_TEST_END) {
-        // TODO ???
+    // disabled apu/io access (not used)
+    if (addr >= 0x4018 && addr <= 0x401F) {
         WARNING("APU/IO test regs not available ($%04X)\n", addr);
-        // EXIT(1);
         return;
     }
 
-    // cartridge access
-    if (addr >= MC_CART_START) {
-        addr = cart_cpu_map(addr);
-        addr -= MC_CART_START;
-        cartmem[addr] = data;
-        return;
-    }
 
     // Should not get here
     ERROR("Unknown cpu write request addr (%02X -> $%04X)\n", data, addr);
@@ -222,9 +222,9 @@ enum ppu_memmap {
     MP_PAL_END   = 0x3FFF,
     MP_PAL_SIZE  = 256
 };
-static u8 chrrom[MP_PT_SIZE] = {0};
-static u8 vram[MP_NT_SIZE] = {0};
-static u8 palmem[MP_PAL_SIZE] = {0};
+static u8 chrrom[(8*1024)] = {0};
+static u8 vram[(4*1024)] = {0};
+static u8 palmem[256] = {0};
 
 // Name tables
 enum NT_MAP {
@@ -253,7 +253,7 @@ static u16 mirror(u16 addr)
 {
 #ifdef DEBUG
     CHECK_INIT;
-    assert(addr >= MP_NT_START);
+    assert(addr >= 0x2000);
 #endif
 
     enum mirror_mode mirror_mode = cart_get_mirror_mode();
@@ -281,7 +281,7 @@ static u16 mirror(u16 addr)
         EXIT(1);
         break;
     }
-    return addr - MP_NT_START;
+    return addr - 0x2000;
 }
 
 u8 ppu_read(u16 addr)
@@ -290,27 +290,27 @@ u8 ppu_read(u16 addr)
     CHECK_INIT;
 #endif
     // Pattern table access
-    if (addr <= MP_PT_END) {
+    if (addr <= 0x1FFF) {
         addr = cart_ppu_map(addr);
         return chrrom[addr];
     }
 
     // Nametable access
-    if (addr >= MP_NT_START && addr <= MP_NT_END) {
+    if (addr >= 0x2000 && addr <= 0x2FFF) {
         addr = mirror(addr);
         return vram[addr];
     }
 
     // Nametable mirror access
-    if (addr >= MP_NT_MIR_START && addr <= MP_NT_MIR_END) {
+    if (addr >= 0x3000 && addr <= 0x3EFF) {
         addr = mirror(addr - 0x1000);
         return vram[addr];
     }
 
     // pallete access
-    if (addr >= MP_PAL_START && addr <= MP_PAL_END) {
+    if (addr >= 0x3F00 && addr <= 0x3FFF) {
         // adjust for mirrors
-        addr = (addr - MP_PAL_START) % MP_PAL_SIZE;
+        addr = (addr - 0x3F00) & 0xFF;
         // one byte mirrors
         if (addr == 0x10) {
             addr = 0x00;
@@ -336,30 +336,30 @@ void ppu_write(u8 data, u16 addr)
     CHECK_INIT;
 #endif
     // Pattern table access
-    if (addr <= MP_PT_END) {
+    if (addr <= 0x1FFF) {
         addr = cart_ppu_map(addr);
         chrrom[addr] = data;
         return;
     }
 
     // Nametable access
-    if (addr >= MP_NT_START && addr <= MP_NT_END) {
+    if (addr >= 0x2000 && addr <= 0x2FFF) {
         addr = mirror(addr);
         vram[addr] = data;
         return;
     }
 
     // Nametable mirror access
-    if (addr >= MP_NT_MIR_START && addr <= MP_NT_MIR_END) {
+    if (addr >= 0x3000 && addr <= 0x3EFF) {
         addr = mirror(addr - 0x1000);
         vram[addr] = data;
         return;
     }
 
     // pallete access
-    if (addr >= MP_PAL_START && addr <= MP_PAL_END) {
+    if (addr >= 0x3F00 && addr <= 0x3FFF) {
         // adjust for mirrors
-        addr = (addr - MP_PAL_START) % MP_PAL_SIZE;
+        addr = (addr - 0x3F00) & 0xFF;
         // one byte mirrors
         if (addr == 0x10) {
             addr = 0x00;

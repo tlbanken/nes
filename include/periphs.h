@@ -32,14 +32,17 @@ enum nes_keycode {
 	KEY_STEP       = (1 << 9),
 	KEY_CONTINUE   = (1 << 10),
 	KEY_FRAME_MODE = (1 << 11),
+	KEY_PAL_CHANGE = (1 << 12),
 };
 
-void periphs_init(const char *title);
+void periphs_init(const char *title, bool debug_display);
 void periphs_free();
 void periphs_refresh();
 u16 periphs_poll();
 void set_px(int x, int y, nes_color_t color);
+void set_px_pt(int table_side, u16 x, u16 y, nes_color_t color);
 void clear_screen();
+bool periphs_one_sec_passed();
 
 
 #endif

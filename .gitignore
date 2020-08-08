@@ -3,4 +3,5 @@
 **/*.dump
 nes
 roms
-romtests
+testroms
+gmon.out

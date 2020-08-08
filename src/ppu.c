@@ -211,6 +211,44 @@ static nes_color_t nes_colors[] =
     /*0x3f -> */{0x00, 0x00, 0x00}
 };
 
+//---------------------------------------------------------------
+// PPU Debug Display
+//---------------------------------------------------------------
+void draw_pattern_table(u16 table_id, u8 pal_id)
+{
+    for (u16 ytile = 0; ytile < 16; ytile++) {
+        for (u16 xtile = 0; xtile < 16; xtile++) {
+            // convert 2D indexing to 1D indexing
+            u16 byte_offset = (ytile * 256) + (xtile * 16);
+
+            // Now iterate over the bytes in a tile and then each bit in the byte
+            for (u16 row = 0; row < 8; row++) {
+                u16 addr = table_id * 0x1000 + byte_offset + row;
+                u8 tile_lsb = ppu_read(addr);
+                u8 tile_msb = ppu_read(addr + 8);
+
+                for (u16 col = 0; col < 8; col++) {
+                    u8 px = (tile_lsb & 0x1) + (tile_msb & 0x1);
+                    // shift tile byte
+                    tile_lsb >>= 1;
+                    tile_msb >>= 1;
+
+                    u16 x = (7 - col) + (xtile * 8);
+                    u16 y = row + (ytile * 8);
+
+                    u8 color_id = ppu_read(0x3F00 + (pal_id << 2) + px);
+                    nes_color_t color = nes_colors[color_id];
+
+                    set_px_pt(table_id, x, y, color);
+                }
+            }
+        }
+    }
+}
+
+//---------------------------------------------------------------
+// PPU Helpers
+//---------------------------------------------------------------
 static inline bool in_visible_scanlines()
 {
     return scanline < 240 || scanline == 261;
@@ -478,7 +516,6 @@ bool ppu_step(int clock_budget)
         if ((cycle >= 1 && cycle <= 257) || (cycle >= 321 && cycle <= 340)) {
             // update the shifter registers
             shift_bgshifters();
-            
 
             // 8 cycle fetch pattern
             u16 addr, hi;
