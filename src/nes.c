@@ -75,7 +75,7 @@ static void run()
         // execution of cpu and ppu
         if (!paused || (kc & KEY_STEP) || (frame_mode && !frame_finished)) {
             cycles = Cpu_Step();
-            // frame_finished = Ppu_Step(3 * cycles);
+            frame_finished = Ppu_Step(3 * cycles);
             // rounds++;
         }
 
@@ -143,10 +143,10 @@ int main(int argc, char **argv)
     Mem_Init();
     Cart_Init();
     Cpu_Init();
-    // Ppu_Init();
+    Ppu_Init();
     char title[64] = "NES - ";
     strncat(title, rompath, 64);
-    Vac_Init(title, true);
+    Vac_Init(title, false);
 
     // load up the rom and start the game
     Cart_Load(rompath);

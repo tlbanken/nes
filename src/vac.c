@@ -23,6 +23,9 @@ static u16 keystate;
 static u32 stickycount;
 static bool debug_on;
 
+// video buffer
+static nes_color_t vbuf[RES_X * RES_Y];
+
 static int scale(int val)
 {
     return val * pxscale;
@@ -157,7 +160,22 @@ u16 Vac_Poll()
 
 void Vac_Refresh()
 {
-    reset_draw_color();
+    // draw out buffer
+    for (int y = 0; y < RES_Y; y++) {
+        for (int x = 0; x < RES_X; x++) {
+            // set color
+            nes_color_t color = vbuf[(y * RES_X) + x];
+            int rc = SDL_SetRenderDrawColor(renderer, color.red, color.green, color.blue, SDL_ALPHA_OPAQUE);
+            assert(rc == 0);
+
+            SDL_Rect rectangle;
+            rectangle.x = scale(x);
+            rectangle.y = scale(y);
+            rectangle.w = scale(1);
+            rectangle.h = scale(1);
+            SDL_RenderFillRect(renderer, &rectangle);
+        }
+    }
     SDL_RenderPresent(renderer);
     Vac_Poll();
 }
@@ -169,16 +187,9 @@ void Vac_SetPx(int x, int y, nes_color_t color)
         return;
     }
 
-    // set color
-    int rc = SDL_SetRenderDrawColor(renderer, color.red, color.green, color.blue, SDL_ALPHA_OPAQUE);
-    assert(rc == 0);
+    vbuf[y * RES_X + x] = color;
 
-    SDL_Rect rectangle;
-    rectangle.x = scale(x);
-    rectangle.y = scale(y);
-    rectangle.w = scale(1);
-    rectangle.h = scale(1);
-    SDL_RenderFillRect(renderer, &rectangle);
+
 }
 
 void Vac_SetPxPt(int table_side, u16 x, u16 y, nes_color_t color)
