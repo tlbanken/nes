@@ -54,10 +54,7 @@ enum cpu_memmap {
 };
 static u8 iram[MC_IRAM_SIZE] = {0};
 static u8 cartmem[MC_CART_SIZE] = {0};
-static u8 ctrl1_buf;
-static u8 ctrl1_reads;
-static u8 ctrl2_buf;
-static u8 ctrl2_reads;
+static u8 controller[2];
 
 u8 Mem_CpuRead(u16 addr)
 {
@@ -85,25 +82,17 @@ u8 Mem_CpuRead(u16 addr)
         u16 res;
         switch (addr) {
         case 0x4016: // Controller 1
-            // official nes controller returns 1 when report is over
-            if (ctrl2_reads == 8) {
-                return 0x41;
-            }
             // return next in report
-            res = (ctrl1_buf >> ctrl1_reads) & 0x1;
-            ctrl1_reads++;
-            return res | 0x40; // upper bits same as addr
+            res = (controller[0] & 0x80) > 0;
+            controller[0] <<= 1;
+            return res; // upper bits same as addr
         case 0x4017: // Controller 2
             // NOTE: For now, ignore controller 2
-            return 0x41;
-            // official nes controller returns 1 when report is over
-            if (ctrl2_reads == 8) {
-                return 0x41;
-            }
+            return 0x0;
             // return next in report
-            res = (ctrl2_buf >> ctrl2_reads) & 0x1;
-            ctrl2_reads++;
-            return res | 0x40; // upper bits same as addr
+            res = (controller[1] & 0x80) > 0;
+            controller[1] <<= 1;
+            return res; // upper bits same as addr
         default:
             WARNING("APU/IO reg not available ($%04X)\n", addr);
             break;
@@ -158,14 +147,12 @@ void Mem_CpuWrite(u8 data, u16 addr)
             break;
         case 0x4016: // Controller 1
             if (data & 0x1) {
-                ctrl1_buf = Vac_Poll() & 0xFF;
-                ctrl1_reads = 0;
+                controller[0] = Vac_Poll() & 0xFF;
             }
             break;
         case 0x4017: // Controller 2
             if (data & 0x1) {
-                ctrl2_buf = Vac_Poll() & 0xFF;
-                ctrl2_reads = 0;
+                controller[1] = Vac_Poll() & 0xFF;
             }
             break;
         default:

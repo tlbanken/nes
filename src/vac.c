@@ -14,13 +14,11 @@
 #define RES_Y 240
 #define DBG_RES_X (128*2 + 3)
 
-#define STICKY_LIMIT 1
+#define STICKY_LIMIT 10
 
 static int pxscale;
 static SDL_Window *window;
 static SDL_Renderer *renderer;
-static u16 keystate;
-static u32 stickycount;
 static bool debug_on;
 
 // video buffer
@@ -43,58 +41,60 @@ static void reset_draw_color()
     assert(rc == 0);
 }
 
-static void sdl_to_nes_key(SDL_Keycode keycode)
+static u16 toggle_key(SDL_Keycode keycode, u16 keystate)
 {
     switch (keycode) {
     // Game pad keys
     case SDLK_j:
-        keystate |= KEY_A;
+        keystate ^= KEY_A;
         break;
     case SDLK_k:
-        keystate |= KEY_B;
+        keystate ^= KEY_B;
         break;
     case SDLK_w:
-        keystate |= KEY_UP;
+        keystate ^= KEY_UP;
         break;
     case SDLK_s:
-        keystate |= KEY_DOWN;
+        keystate ^= KEY_DOWN;
         break;
     case SDLK_d:
-        keystate |= KEY_RIGHT;
+        keystate ^= KEY_RIGHT;
         break;
     case SDLK_a:
-        keystate |= KEY_LEFT;
+        keystate ^= KEY_LEFT;
         break;
     case SDLK_RETURN:
-        keystate |= KEY_START;
+        keystate ^= KEY_START;
         break;
-    case SDLK_BACKSPACE:
-        keystate |= KEY_SELECT;
+    case SDLK_RSHIFT:
+        keystate ^= KEY_SELECT;
         break;
     // Debug tools
     case SDLK_n:
-        keystate |= KEY_STEP;
+        keystate ^= KEY_STEP;
         break;
     case SDLK_p:
-        keystate |= KEY_PAUSE;
+        keystate ^= KEY_PAUSE;
         break;
     case SDLK_c:
-        keystate |= KEY_CONTINUE;
+        keystate ^= KEY_CONTINUE;
         break;
     case SDLK_f:
-        keystate |= KEY_FRAME_MODE;
+        keystate ^= KEY_FRAME_MODE;
         break;
     case SDLK_l:
-        keystate |= KEY_PAL_CHANGE;
+        keystate ^= KEY_PAL_CHANGE;
+        break;
+    case SDLK_ESCAPE:
+        keystate ^= KEY_RESET;
         break;
     }
+    return keystate;
 }
 
 void Vac_Init(const char *title, bool debug_display)
 {
     pxscale = 4;
-    stickycount = 0;
-    keystate = 0;
     debug_on = debug_display;
 
     int rc;
@@ -136,14 +136,7 @@ void Vac_Free()
 
 u16 Vac_Poll()
 {
-    // crude sticky keys impl
-    if (stickycount >= STICKY_LIMIT) {
-        stickycount = 0;
-        keystate = 0;
-    } else {
-        stickycount++;
-    }
-
+    static u16 keystate = 0;
     SDL_Event e;
     SDL_Keycode keycode;
     if (SDL_PollEvent(&e)) {
@@ -153,7 +146,12 @@ u16 Vac_Poll()
             break;
         case SDL_KEYDOWN:
             keycode = e.key.keysym.sym;
-            sdl_to_nes_key(keycode);
+            keystate = toggle_key(keycode, keystate);
+            break;
+        case SDL_KEYUP:
+            keycode = e.key.keysym.sym;
+            keystate = toggle_key(keycode, keystate);
+            break;
         }
     }
     return keystate;
@@ -231,12 +229,18 @@ void Vac_ClearScreen()
     SDL_RenderClear(renderer);
 }
 
+unsigned int Vac_MsPassedFrom(unsigned int from)
+{
+    unsigned int cur_ms = SDL_GetTicks();
+    return cur_ms - from;
+}
+
 bool Vac_OneSecPassed()
 {
     static unsigned int last_ms = 0;
-    unsigned int cur_ms = SDL_GetTicks();
-    if (cur_ms > last_ms + 1000) {
-        last_ms = cur_ms;
+    unsigned int time_passed = Vac_MsPassedFrom(last_ms);
+    if (time_passed >= 1000) {
+        last_ms += time_passed;
         return true;
     } else {
         return false;

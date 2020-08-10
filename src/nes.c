@@ -69,6 +69,8 @@ static void run(const char *title, bool dbg_mode)
         } else if (kc & KEY_FRAME_MODE) {
             frame_mode = !frame_mode;
             paused = true;
+        } else if (kc & KEY_RESET) {
+            return;
         }
 
         if (kc & KEY_PAL_CHANGE) {
@@ -172,13 +174,19 @@ int main(int argc, char **argv)
     Ppu_Init();
     char title[64] = "NES - ";
     strncat(title, rompath, 64);
-    bool dbg_mode = false;
+    bool dbg_mode = true;
     Vac_Init(title, dbg_mode);
 
     // load up the rom and start the game
     Cart_Load(rompath);
-    Cpu_Reset();
-    run(title, dbg_mode);
+
+    // run only returns on RESET
+    while (1) {
+        Cpu_Reset();
+        Ppu_Reset();
+        run(title, dbg_mode);
+        Vac_ClearScreen();
+    }
 
     Vac_Free();
     Neslog_Free();

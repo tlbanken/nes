@@ -318,7 +318,15 @@ void Ppu_Init()
     assert(sizeof(reg_ppustatus_t) == 1);
     assert(sizeof(loopyreg_t) == 2);
 
+    is_init = true;
+}
 
+void Ppu_Reset()
+{
+#ifdef DEBUG
+    CHECK_INIT;
+#endif
+    
     // setup initial state
     cycle = 0;
     scanline = 0;
@@ -342,8 +350,6 @@ void Ppu_Init()
     bgshifter_attr_hi = 0;
     nx_bgtile_id = 0;
     nx_bgtile_attr = 0;
-
-    is_init = true;
 }
 
 bool Ppu_Step(int clock_budget)
