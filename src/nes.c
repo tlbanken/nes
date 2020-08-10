@@ -44,11 +44,14 @@ static void exit_handler(int rc)
     Vac_Free();
 }
 
-static void run()
+static void run(const char *title, bool dbg_mode)
 {
+    char title_fps[64];
+    char fps[16];
+
     // int limit = 9000;
     // int rounds = 0;
-    int cycles;
+    u32 cycles = 0;
     u32 num_frames = 0;
     // bool paused = true; // NOTE: TESTING
     bool paused = false;
@@ -74,23 +77,34 @@ static void run()
 
         // execution of cpu and ppu
         if (!paused || (kc & KEY_STEP) || (frame_mode && !frame_finished)) {
-            cycles = Cpu_Step();
-            frame_finished = Ppu_Step(3 * cycles);
+            // if we aren't in step mode, we advance cpu n many cycles
+            if (kc & KEY_STEP) {
+                cycles = Cpu_Step();
+                frame_finished = Ppu_Step(3 * cycles);
+            } else {
+                while (cycles < 20) {
+                    cycles += Cpu_Step();
+                }
+                frame_finished = Ppu_Step(3 * cycles);
+            }
+            cycles = 0;
             // rounds++;
         }
 
         // change pallete on debug display
-        if (kc & KEY_PAL_CHANGE) {
-            // draw_pattern_table(0, pal_id - 1);
-            // draw_pattern_table(1, pal_id - 1);
+        if (kc & KEY_PAL_CHANGE && dbg_mode) {
+            Ppu_DrawPT(0, pal_id - 1);
+            Ppu_DrawPT(1, pal_id - 1);
             Vac_Refresh();
         }
 
         // update screen on frame finish
         if (frame_finished || (kc & KEY_STEP)) {
             // debug
-            // draw_pattern_table(0, pal_id - 1);
-            // draw_pattern_table(1, pal_id - 1);
+            if (dbg_mode) {
+                Ppu_DrawPT(0, pal_id - 1);
+                Ppu_DrawPT(1, pal_id - 1);
+            }
 
             frame_finished = false;
             Vac_Refresh();
@@ -103,7 +117,19 @@ static void run()
         // calc frame rate
         if (Vac_OneSecPassed()) {
             // display frame rate
-            printf("%d\n", num_frames);
+            strncpy(title_fps, title, 64);
+            sprintf(fps, " - %d fps", num_frames);
+            strncat(title_fps, fps, 64);
+            Vac_SetWindowTitle(title_fps);
+            num_frames = 0;
+        } else if (num_frames > 65) {
+            strncpy(title_fps, title, 64);
+            strncat(title_fps, " - 65 fps (capped)", 64);
+            Vac_SetWindowTitle(title_fps);
+            // cap to 60 fps
+            while(!Vac_OneSecPassed()) {
+                Vac_Poll();
+            }
             num_frames = 0;
         }
     }
@@ -146,12 +172,13 @@ int main(int argc, char **argv)
     Ppu_Init();
     char title[64] = "NES - ";
     strncat(title, rompath, 64);
-    Vac_Init(title, false);
+    bool dbg_mode = false;
+    Vac_Init(title, dbg_mode);
 
     // load up the rom and start the game
     Cart_Load(rompath);
     Cpu_Reset();
-    run();
+    run(title, dbg_mode);
 
     Vac_Free();
     Neslog_Free();

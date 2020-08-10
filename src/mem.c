@@ -70,20 +70,17 @@ u8 Mem_CpuRead(u16 addr)
         addr -= 0x4020;
         return cartmem[addr];
     }
-
     // internal ram access
-    if (addr <= 0x1FFF) {
+    else if (addr <= 0x1FFF) {
         return iram[addr & 0x7FF];
     }
-
     // ppu register access
-    if (addr >= 0x2000 && addr <= 0x3FFF) {
+    else if (addr >= 0x2000 && addr <= 0x3FFF) {
         // convert to 0-7 addr space and read
         return Ppu_RegRead(addr & 0x7);
     }
-
     // apu/io reads
-    if (addr >= 0x4000 && addr <= 0x4017) {
+    else if (addr >= 0x4000 && addr <= 0x4017) {
         // TODO read the correct apu/io reg
         u16 res;
         switch (addr) {
@@ -114,9 +111,8 @@ u8 Mem_CpuRead(u16 addr)
         // EXIT(1);
         return 0;
     }
-
     // disabled apu/io reads
-    if (addr >= 0x4018 && addr <= 0x401F) {
+    else if (addr >= 0x4018 && addr <= 0x401F) {
         // TODO ???
         WARNING("APU/IO test regs not available ($%04X)\n", addr);
         // EXIT(1);
@@ -142,22 +138,19 @@ void Mem_CpuWrite(u8 data, u16 addr)
         cartmem[addr] = data;
         return;
     }
-
     // internal ram access
-    if (addr <= 0x1FFF) {
+    else if (addr <= 0x1FFF) {
         iram[addr & 0x7FF] = data;
         return;
     }
-
     // ppu register access
-    if (addr >= 0x2000 && addr <= 0x3FFF) {
+    else if (addr >= 0x2000 && addr <= 0x3FFF) {
         // convert to 0-7 addr space and write
         Ppu_RegWrite(data, addr & 0x7);
         return;
     }
-
     // apu/io access
-    if (addr >= 0x4000 && addr <= 0x4017) {
+    else if (addr >= 0x4000 && addr <= 0x4017) {
         // TODO read the correct apu/io reg
         switch (addr) {
         case 0x4014:
@@ -182,9 +175,8 @@ void Mem_CpuWrite(u8 data, u16 addr)
         // EXIT(1);
         return;
     }
-
     // disabled apu/io access (not used)
-    if (addr >= 0x4018 && addr <= 0x401F) {
+    else if (addr >= 0x4018 && addr <= 0x401F) {
         WARNING("APU/IO test regs not available ($%04X)\n", addr);
         return;
     }
@@ -255,22 +247,10 @@ static u16 mirror(u16 addr)
     enum mirror_mode mirror_mode = Cart_GetMirrorMode();
     switch (mirror_mode) {
     case MIR_HORZ:
-        if (addr >= NT_TOPL && addr < NT_TOPR) {
-            addr = addr; // no mirror
-        } else if (addr < NT_BOTL) {
-            addr -= NT_SIZE;
-        } else if (addr < NT_BOTR) {
-            addr -= NT_SIZE;
-        } else {
-            addr -= (NT_SIZE * 2);
-        }
+        addr &= ~(0x4 << 8);
         break;
     case MIR_VERT:
-        if (addr >= NT_TOPL && addr < NT_BOTL) {
-            addr = addr; // no mirror needed
-        } else {
-            addr -= (NT_SIZE * 2);
-        }
+        addr &= ~(0x8 << 8);
         break;
     case MIR_4SCRN:
         ERROR("No support for 4 screen mirror mode!\n");
@@ -290,21 +270,18 @@ u8 Mem_PpuRead(u16 addr)
         addr = Cart_PpuMap(addr);
         return chrrom[addr];
     }
-
     // Nametable access
-    if (addr >= 0x2000 && addr <= 0x2FFF) {
+    else if (addr >= 0x2000 && addr <= 0x2FFF) {
         addr = mirror(addr);
         return vram[addr];
     }
-
     // Nametable mirror access
-    if (addr >= 0x3000 && addr <= 0x3EFF) {
+    else if (addr >= 0x3000 && addr <= 0x3EFF) {
         addr = mirror(addr - 0x1000);
         return vram[addr];
     }
-
     // pallete access
-    if (addr >= 0x3F00 && addr <= 0x3FFF) {
+    else if (addr >= 0x3F00 && addr <= 0x3FFF) {
         // adjust for mirrors
         addr = (addr - 0x3F00) & 0xFF;
         // one byte mirrors
@@ -337,23 +314,20 @@ void Mem_PpuWrite(u8 data, u16 addr)
         chrrom[addr] = data;
         return;
     }
-
     // Nametable access
-    if (addr >= 0x2000 && addr <= 0x2FFF) {
+    else if (addr >= 0x2000 && addr <= 0x2FFF) {
         addr = mirror(addr);
         vram[addr] = data;
         return;
     }
-
     // Nametable mirror access
-    if (addr >= 0x3000 && addr <= 0x3EFF) {
+    else if (addr >= 0x3000 && addr <= 0x3EFF) {
         addr = mirror(addr - 0x1000);
         vram[addr] = data;
         return;
     }
-
     // pallete access
-    if (addr >= 0x3F00 && addr <= 0x3FFF) {
+    else if (addr >= 0x3F00 && addr <= 0x3FFF) {
         // adjust for mirrors
         addr = (addr - 0x3F00) & 0xFF;
         // one byte mirrors

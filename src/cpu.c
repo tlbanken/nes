@@ -385,11 +385,12 @@ void Cpu_Irq()
     state.sp--;
     Mem_CpuWrite(pc_lo, SP);
     state.sp--;
+    
+    // side effect
+    state.psr |= PSR_I;
     // push psr with B1 flag
     Mem_CpuWrite(state.psr | PSR_B1, SP);
     state.sp--;
-    // side effect
-    state.psr |= PSR_I;
 
     // call NMI vector
     u16 lo = Mem_CpuRead(IRQ_VECTOR);
@@ -397,9 +398,9 @@ void Cpu_Irq()
     state.pc = (hi << 8) | lo;
 
     // pop back state
-    state.pc = (pc_hi << 8) | pc_lo;
-    state.sp += 3;
-    state.psr = Mem_CpuRead(SP) & ~PSR_B1;
+    // state.pc = (pc_hi << 8) | pc_lo;
+    // state.sp += 3;
+    // state.psr = Mem_CpuRead(SP) & ~PSR_B1;
 }
 
 void Cpu_Nmi()
@@ -414,11 +415,12 @@ void Cpu_Nmi()
     state.sp--;
     Mem_CpuWrite(pc_lo, SP);
     state.sp--;
+
+    // side effect
+    state.psr |= PSR_I;
     // push psr with B1 flag
     Mem_CpuWrite(state.psr | PSR_B1, SP);
     state.sp--;
-    // side effect
-    state.psr |= PSR_I;
 
     // call NMI vector
     u16 lo = Mem_CpuRead(NMI_VECTOR);
@@ -426,9 +428,9 @@ void Cpu_Nmi()
     state.pc = (hi << 8) | lo;
 
     // pop back state
-    state.pc = (pc_hi << 8) | pc_lo;
-    state.sp += 3;
-    state.psr = Mem_CpuRead(SP) & ~PSR_B1;
+    // state.pc = (pc_hi << 8) | pc_lo;
+    // state.sp += 3;
+    // state.psr = Mem_CpuRead(SP) & ~PSR_B1;
 }
 
 // initial values according to http://wiki.nesdev.com/w/index.php/CPU_power_up_state

@@ -12,9 +12,9 @@
 
 #define RES_X 256
 #define RES_Y 240
-#define DBG_RES_X (128*2 + 2)
+#define DBG_RES_X (128*2 + 3)
 
-#define STICKY_LIMIT 50
+#define STICKY_LIMIT 1
 
 static int pxscale;
 static SDL_Window *window;
@@ -25,6 +25,7 @@ static bool debug_on;
 
 // video buffer
 static nes_color_t vbuf[RES_X * RES_Y];
+static nes_color_t pt_vbuf[2][128*128];
 
 static int scale(int val)
 {
@@ -38,7 +39,7 @@ static int scale_dbg(int val)
 
 static void reset_draw_color()
 {
-    int rc = SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, SDL_ALPHA_OPAQUE);
+    int rc = SDL_SetRenderDrawColor(renderer, 0x77, 0x85, 0x8C, SDL_ALPHA_OPAQUE);
     assert(rc == 0);
 }
 
@@ -176,6 +177,30 @@ void Vac_Refresh()
             SDL_RenderFillRect(renderer, &rectangle);
         }
     }
+
+    // draw out debug display
+    if (debug_on) {
+        for (int table_side = 0; table_side < 2; table_side++) {
+            for (int y = 0; y < 128; y++) {
+                for (int x = 0; x < 128; x++) {
+                    // set color
+                    nes_color_t color = pt_vbuf[table_side][y*128 + x];
+                    int rc = SDL_SetRenderDrawColor(renderer, color.red, color.green, color.blue, SDL_ALPHA_OPAQUE);
+                    assert(rc == 0);
+
+                    SDL_Rect rect;
+                    rect.x = scale_dbg(x + 1) + scale(RES_X) + (scale_dbg(128) * table_side
+                        + scale_dbg(1) * table_side);
+                    rect.y = scale_dbg(y + 1);
+                    rect.w = scale_dbg(1);
+                    rect.h = scale_dbg(1);
+                    SDL_RenderFillRect(renderer, &rect);
+                }
+            }
+        }
+    }
+
+    reset_draw_color();
     SDL_RenderPresent(renderer);
     Vac_Poll();
 }
@@ -196,18 +221,9 @@ void Vac_SetPxPt(int table_side, u16 x, u16 y, nes_color_t color)
 {
     assert(x < 128 && y < 128);
     assert(debug_on);
+    assert(table_side >= 0 && table_side <= 1);
 
-    // set color
-    int rc = SDL_SetRenderDrawColor(renderer, color.red, color.green, color.blue, SDL_ALPHA_OPAQUE);
-    assert(rc == 0);
-
-    SDL_Rect rect;
-    rect.x = scale_dbg(x + 1) + scale(RES_X) + (scale_dbg(128) * table_side
-        + scale_dbg(1) * table_side);
-    rect.y = scale_dbg(y + 1);
-    rect.w = scale_dbg(1);
-    rect.h = scale_dbg(1);
-    SDL_RenderFillRect(renderer, &rect);
+    pt_vbuf[table_side][y*128 + x] = color;
 }
 
 void Vac_ClearScreen()
@@ -225,4 +241,9 @@ bool Vac_OneSecPassed()
     } else {
         return false;
     }
+}
+
+void Vac_SetWindowTitle(const char *title)
+{
+    SDL_SetWindowTitle(window, title);
 }

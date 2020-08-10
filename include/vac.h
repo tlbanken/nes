@@ -43,6 +43,7 @@ void Vac_SetPx(int x, int y, nes_color_t color);
 void Vac_SetPxPt(int table_side, u16 x, u16 y, nes_color_t color);
 void Vac_ClearScreen();
 bool Vac_OneSecPassed();
+void Vac_SetWindowTitle(const char *title);
 
 
 #endif

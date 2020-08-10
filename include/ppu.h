@@ -18,6 +18,6 @@ u8 Ppu_RegRead(u16 reg);
 void Ppu_RegWrite(u8 val, u16 reg);
 void Ppu_Oamdma(u8 hi);
 void Ppu_Dump();
-// void draw_pattern_table(u16 table_id, u8 pal_id);
+void Ppu_DrawPT(u16 table_id, u8 pal_id);
 
 #endif

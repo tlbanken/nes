@@ -21,8 +21,8 @@
 typedef struct ines_header {
     char str_nes[4]; // should contain "NES"
     char magic_1A;   // MS-DOS end-of-file
-    u8 prgrom_size;  // Bank Size in 16 KB units
-    u8 chrrom_size;  // Bank Size in 8 KB units
+    u8 prgrom_banks;  // Bank Size in 16 KB units
+    u8 chrrom_banks;  // Bank Size in 8 KB units
     struct {
         u8 mirror_mode: 1;   // 0: horz, 1: vert
         u8 battery: 1;       // 0: No battey backed rom, 1: yes battery
@@ -33,7 +33,7 @@ typedef struct ines_header {
         u8 nes2: 2;          // if == 2 then flags 8-15 in NES 2.0 format
     } flags;
     u8 mapper_num;
-    u8 prgram_size; // PRG RAM size in 8KB units
+    u8 prgram_banks; // PRG RAM size in 8KB units
 
     // Some more stuff but its not important :/
 } ines_header_t;
@@ -57,8 +57,8 @@ static ines_header_t read_ines_header(FILE *file)
     header.str_nes[3] = '\0';
     i += 3;
     header.magic_1A = filebuf[i++];
-    header.prgrom_size = filebuf[i++];
-    header.chrrom_size = filebuf[i++];
+    header.prgrom_banks = filebuf[i++];
+    header.chrrom_banks = filebuf[i++];
 
     u8 flags6, flags7;
     flags6 = filebuf[i++];
@@ -76,7 +76,7 @@ static ines_header_t read_ines_header(FILE *file)
     header.mapper_num |= (flags7 & 0xF0);
     // fill in rest of header
     header.mapper_num = filebuf[i++];
-    header.prgram_size = filebuf[i++];
+    header.prgram_banks = filebuf[i++];
 
     return header;
 }
@@ -84,12 +84,6 @@ static ines_header_t read_ines_header(FILE *file)
 // *** Mappers ***
 static u16 cpu_map000(u16 addr)
 {
-    // TODO figure out what this is?
-    if (addr < 0x6000) {
-        WARNING("Trying to access unsupported address ($%04X)\n", addr);
-        return addr;
-    }
-
     // PRG-RAM
     if (addr >= 0x6000 && addr <= 0x7FFF) {
         return addr;
@@ -100,10 +94,17 @@ static u16 cpu_map000(u16 addr)
         return ((addr - 0x8000) % prgrom_size) + 0x8000;
     }
 
+    // TODO figure out what this is?
+    if (addr < 0x6000) {
+        WARNING("Trying to access unsupported address ($%04X)\n", addr);
+        return addr;
+    }
+
     // should not get here
     assert(0);
     return 0;
 }
+
 static u16 ppu_map000(u16 addr)
 {
     return addr;
@@ -111,7 +112,7 @@ static u16 ppu_map000(u16 addr)
 
 // *** END Mappers ***
 static bool is_init = false;
-void Cart_Init(const char *path)
+void Cart_Init()
 {
     is_init = true;
 }
@@ -135,9 +136,9 @@ void Cart_Load(const char *path)
         EXIT(1);
     }
 
-    prgrom_size = inesh.prgrom_size * (16*1024);
+    prgrom_size = inesh.prgrom_banks * (16*1024);
     assert(prgrom_size != 0);
-    chrrom_size = inesh.chrrom_size * (8*1024);
+    chrrom_size = inesh.chrrom_banks * (8*1024);
     // assert(chrrom_size != 0);
 
     // write out prg rom
@@ -231,8 +232,8 @@ void Cart_Dump()
     fprintf(ofile, "---------------------------------------\n");
     fprintf(ofile, "NES STR: %s\n", inesh.str_nes);
     fprintf(ofile, "Magic 1A: %02X\n", inesh.magic_1A);
-    fprintf(ofile, "Num PRG-ROM Banks: %u\n", inesh.prgrom_size);
-    fprintf(ofile, "Num CHR-ROM Banks: %u\n", inesh.chrrom_size);
+    fprintf(ofile, "Num PRG-ROM Banks: %u\n", inesh.prgrom_banks);
+    fprintf(ofile, "Num CHR-ROM Banks: %u\n", inesh.chrrom_banks);
     fprintf(ofile, "*** Flags ***\n");
     fprintf(ofile, "    Mirror Type: %u\n", inesh.flags.mirror_mode);
     fprintf(ofile, "    Battery: %u\n", inesh.flags.battery);
@@ -242,7 +243,7 @@ void Cart_Dump()
     fprintf(ofile, "    PlayChoice-10: %u\n", inesh.flags.playchoice_10);
     fprintf(ofile, "    NES 2.0: %u\n", inesh.flags.nes2);
     fprintf(ofile, "Mapper Num: %u\n", inesh.mapper_num);
-    fprintf(ofile, "Num Ram Banks: %u\n", inesh.prgram_size);
+    fprintf(ofile, "Num Ram Banks: %u\n", inesh.prgram_banks);
     fprintf(ofile, "---------------------------------------\n");
     fclose(ofile);
 }

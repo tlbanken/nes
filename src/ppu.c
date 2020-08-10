@@ -98,8 +98,8 @@ static u8 oamaddr;
 // https://wiki.nesdev.com/w/index.php/PPU_scrolling
 typedef union loopyreg {
     struct loopyreg_field {
-        u16 course_x: 5;
-        u16 course_y: 5;
+        u16 coarse_x: 5;
+        u16 coarse_y: 5;
         u16 x_nt: 1;
         u16 y_nt: 1;
         u16 fine_y: 3;
@@ -233,8 +233,22 @@ static void render_px()
         addr += bg_px;         // pixel index
         u8 col_id = Mem_PpuRead(addr) & 0x3F;
         nes_color_t col = nes_colors[col_id];
+        // TODO: Add in color emphasis and greyscale
+
+        // NOTE: Debug
+        // if (scanline == 140) {
+        //     col.red = 255;
+        //     col.blue = 0;
+        //     col.blue = 0;
+        // }
 
         // draw the pixel
+        Vac_SetPx(cycle, scanline, col);
+    } else if (loopy_v.raw >= 0x3F00 && loopy_v.raw <= 0x3FFF) {
+        // pallete hack
+        // https://wiki.nesdev.com/w/index.php/PPU_palettes
+        u8 col_id = Mem_PpuRead(loopy_v.raw) & 0x3F;
+        nes_color_t col = nes_colors[col_id];
         Vac_SetPx(cycle, scanline, col);
     }
 }
@@ -242,11 +256,11 @@ static void render_px()
 static void inc_hori()
 {
     if (ppumask.field.render_bg || ppumask.field.render_sprites) {
-        if (loopy_v.field.course_x == 31) {
-            loopy_v.field.course_x = 0;
+        if (loopy_v.field.coarse_x == 31) {
+            loopy_v.field.coarse_x = 0;
             loopy_v.field.x_nt = !loopy_v.field.x_nt;
         } else {
-            loopy_v.field.course_x++;
+            loopy_v.field.coarse_x++;
         }
     }
 }
@@ -260,13 +274,13 @@ static void inc_vert()
             loopy_v.field.fine_y += 1;
         } else {
             loopy_v.field.fine_y = 0;
-            if (loopy_v.field.course_y == 29) {
-                loopy_v.field.course_y = 0;
+            if (loopy_v.field.coarse_y == 29) {
+                loopy_v.field.coarse_y = 0;
                 loopy_v.field.y_nt = !loopy_v.field.y_nt;
-            } else if (loopy_v.field.course_y == 31) {
-                loopy_v.field.course_y = 0;
+            } else if (loopy_v.field.coarse_y == 31) {
+                loopy_v.field.coarse_y = 0;
             } else {
-                loopy_v.field.course_y++;
+                loopy_v.field.coarse_y++;
             }
         }
     }
@@ -307,7 +321,7 @@ void Ppu_Init()
 
     // setup initial state
     cycle = 0;
-    scanline = 261;
+    scanline = 0;
     al_first_write = true;
     ppudata_buf = 0;
     oddframe = false;
@@ -340,13 +354,18 @@ bool Ppu_Step(int clock_budget)
 
     bool frame_finished = false;
     for (int clocks = 0; clocks < clock_budget; clocks++) {
+
+        // LOG("CY:%03u SL:%03u OD:%u    C:%02X M:%02X S:%02X V:%04X T:%04X\n",
+        //     cycle, scanline, oddframe, ppuctrl.raw, ppumask.raw, ppustatus.raw,
+        //     loopy_v.raw, loopy_t.raw);
+
         // free cycle on oddframes
-        if (scanline == 0 && cycle == 0 && oddframe && ppumask.field.render_bg) {
+        if (scanline == 0 && cycle == 0 && oddframe) {
             cycle = 1;
         }
 
         // Visible Scanlines
-        if (scanline <= 139 || scanline == 261) {
+        if (scanline <= 239 || scanline == 261) {
 
             // clear vblank
             if (scanline == 261 && cycle == 1) {
@@ -370,15 +389,15 @@ bool Ppu_Step(int clock_budget)
                     addr |= (loopy_v.field.y_nt << 11);
                     addr |= (loopy_v.field.x_nt << 10);
                     // course x/y only need 3 msb
-                    addr |= ((loopy_v.field.course_y >> 2) << 3);
-                    addr |= (loopy_v.field.course_x >> 2);
+                    addr |= ((loopy_v.field.coarse_y >> 2) << 3);
+                    addr |= (loopy_v.field.coarse_x >> 2);
                     nx_bgtile_attr = Mem_PpuRead(addr);
 
                     // tiles are in 2x2 chunks so next we figure out which tile we need
-                    if (loopy_v.field.course_y & 0x02) { // top half
+                    if (loopy_v.field.coarse_y & 0x02) { // top half
                         nx_bgtile_attr >>= 4;
                     }
-                    if (loopy_v.field.course_x & 0x02) { // left half
+                    if (loopy_v.field.coarse_x & 0x02) { // left half
                         nx_bgtile_attr >>= 2;
                     }
                     nx_bgtile_attr &= 0x03; // we only need 2 bits to index
@@ -409,7 +428,7 @@ bool Ppu_Step(int clock_budget)
                 load_bgshifters();
                 // reset horizontal loopy registers
                 if (ppumask.field.render_bg || ppumask.field.render_sprites) {
-                    loopy_v.field.course_x = loopy_t.field.course_x;
+                    loopy_v.field.coarse_x = loopy_t.field.coarse_x;
                     loopy_v.field.x_nt     = loopy_t.field.x_nt;
                 }
             } else if (cycle == 256) {
@@ -418,7 +437,7 @@ bool Ppu_Step(int clock_budget)
             } else if (scanline == 261 && (cycle >= 280 && cycle <= 304)) {
                 // reset vertical loopy registers
                 if (ppumask.field.render_bg || ppumask.field.render_sprites) {
-                    loopy_v.field.course_y = loopy_t.field.course_y;
+                    loopy_v.field.coarse_y = loopy_t.field.coarse_y;
                     loopy_v.field.y_nt     = loopy_t.field.y_nt;
                     loopy_v.field.fine_y   = loopy_t.field.fine_y;
                 }
@@ -429,6 +448,9 @@ bool Ppu_Step(int clock_budget)
             // set vblank flag
             if (scanline == 241 && cycle == 1) {
                 ppustatus.field.vblank = 1;
+                if (ppuctrl.field.nmi_gen) {
+                    Cpu_Nmi();
+                }
             }
         }
 
@@ -541,10 +563,10 @@ void Ppu_RegWrite(u8 val, u16 reg)
         break;
     case 5: // PPUSCROLL
         if (al_first_write) {
-            loopy_t.field.course_x = (val >> 3);
+            loopy_t.field.coarse_x = (val >> 3);
             fine_x = (val & 0x7);
         } else {
-            loopy_t.field.course_y = (val >> 3);
+            loopy_t.field.coarse_y = (val >> 3);
             loopy_t.field.fine_y = (val & 0x7);
         }
         al_first_write = !al_first_write;
@@ -582,6 +604,42 @@ void Ppu_Oamdma(u8 hi)
         oamaddr++;
     }
 }
+
+//---------------------------------------------------------------
+// PPU Debug Display
+//---------------------------------------------------------------
+void Ppu_DrawPT(u16 table_id, u8 pal_id)
+{
+    for (u16 ytile = 0; ytile < 16; ytile++) {
+        for (u16 xtile = 0; xtile < 16; xtile++) {
+            // convert 2D indexing to 1D indexing
+            u16 byte_offset = (ytile * 256) + (xtile * 16);
+
+            // Now iterate over the bytes in a tile and then each bit in the byte
+            for (u16 row = 0; row < 8; row++) {
+                u16 addr = table_id * 0x1000 + byte_offset + row;
+                u8 tile_lsb = Mem_PpuRead(addr);
+                u8 tile_msb = Mem_PpuRead(addr + 8);
+
+                for (u16 col = 0; col < 8; col++) {
+                    u8 px = (tile_lsb & 0x1) + (tile_msb & 0x1);
+                    // shift tile byte
+                    tile_lsb >>= 1;
+                    tile_msb >>= 1;
+
+                    u16 x = (7 - col) + (xtile * 8);
+                    u16 y = row + (ytile * 8);
+
+                    u8 color_id = Mem_PpuRead(0x3F00 + (pal_id << 2) + px);
+                    nes_color_t color = nes_colors[color_id & 0x3F];
+
+                    Vac_SetPxPt(table_id, x, y, color);
+                }
+            }
+        }
+    }
+}
+
 
 void Ppu_Dump()
 {
@@ -626,15 +684,15 @@ void Ppu_Dump()
     fprintf(ofile, "$2003 (OAMADDR)   = %02X\n", oamaddr);
     fprintf(ofile, "\n");
     fprintf(ofile, "$2007 (PPUADDR)   = %04X\n", loopy_v.raw);
-    fprintf(ofile, "   course_x: %u\n", loopy_v.field.course_x);
-    fprintf(ofile, "   course_y: %u\n", loopy_v.field.course_y);
+    fprintf(ofile, "   coarse_x: %u\n", loopy_v.field.coarse_x);
+    fprintf(ofile, "   coarse_y: %u\n", loopy_v.field.coarse_y);
     fprintf(ofile, "   x_nt    : %u\n", loopy_v.field.x_nt);
     fprintf(ofile, "   y_nt    : %u\n", loopy_v.field.y_nt);
     fprintf(ofile, "   fine_y  : %u\n", loopy_v.field.fine_y);
     fprintf(ofile, "\n");
     fprintf(ofile, "$2007 (PPUADDR_TEMP)   = %04X\n", loopy_t.raw);
-    fprintf(ofile, "   course_x: %u\n", loopy_t.field.course_x);
-    fprintf(ofile, "   course_y: %u\n", loopy_t.field.course_y);
+    fprintf(ofile, "   coarse_x: %u\n", loopy_t.field.coarse_x);
+    fprintf(ofile, "   coarse_y: %u\n", loopy_t.field.coarse_y);
     fprintf(ofile, "   x_nt    : %u\n", loopy_t.field.x_nt);
     fprintf(ofile, "   y_nt    : %u\n", loopy_t.field.y_nt);
     fprintf(ofile, "   fine_y  : %u\n", loopy_t.field.fine_y);
