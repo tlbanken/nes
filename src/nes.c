@@ -73,8 +73,13 @@ static void run(const char *title, bool dbg_mode)
             return;
         }
 
-        if (kc & KEY_PAL_CHANGE) {
-            pal_id = (pal_id % 8) + 1;
+        if ((kc & KEY_PAL_CHANGE) && dbg_mode) {
+            static unsigned int last_pal_update = 0;
+            unsigned int passed = 0;
+            if ((passed = Vac_MsPassedFrom(last_pal_update)) >= 200) {
+                pal_id = (pal_id % 8) + 1;
+                last_pal_update += passed;
+            }
         }
 
         // execution of cpu and ppu
@@ -84,7 +89,7 @@ static void run(const char *title, bool dbg_mode)
                 cycles = Cpu_Step();
                 frame_finished = Ppu_Step(3 * cycles);
             } else {
-                while (cycles < 20) {
+                while (cycles < 1) {
                     cycles += Cpu_Step();
                 }
                 frame_finished = Ppu_Step(3 * cycles);
@@ -94,7 +99,7 @@ static void run(const char *title, bool dbg_mode)
         }
 
         // change pallete on debug display
-        if (kc & KEY_PAL_CHANGE && dbg_mode) {
+        if (kc & KEY_PAL_CHANGE && dbg_mode && paused) {
             Ppu_DrawPT(0, pal_id - 1);
             Ppu_DrawPT(1, pal_id - 1);
             Vac_Refresh();
@@ -106,6 +111,9 @@ static void run(const char *title, bool dbg_mode)
             if (dbg_mode) {
                 Ppu_DrawPT(0, pal_id - 1);
                 Ppu_DrawPT(1, pal_id - 1);
+
+                // Ppu_DrawNT(0, pal_id - 1);
+                // Ppu_DrawNT(1, pal_id - 1);
             }
 
             frame_finished = false;
@@ -124,13 +132,14 @@ static void run(const char *title, bool dbg_mode)
             strncat(title_fps, fps, 64);
             Vac_SetWindowTitle(title_fps);
             num_frames = 0;
-        } else if (num_frames > 65) {
+        } else if (num_frames > 61) {
             strncpy(title_fps, title, 64);
-            strncat(title_fps, " - 65 fps (capped)", 64);
+            strncat(title_fps, " - 60 fps (capped)", 64);
             Vac_SetWindowTitle(title_fps);
             // cap to 60 fps
             while(!Vac_OneSecPassed()) {
                 Vac_Poll();
+                SDL_Delay(20); // Take some load off of cpu (may cause lag)
             }
             num_frames = 0;
         }

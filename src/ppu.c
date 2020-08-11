@@ -15,18 +15,20 @@
 #define LOG(fmt, ...) Neslog_Log(LID_PPU, fmt, ##__VA_ARGS__);
 static bool is_init = false;
 #define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
-// Object Attrubute Memory (sprites)
-static u8 oam[256] = {0};
+// Object Attrubute Memory (64 sprites)
+static u8 oam[64*4] = {0};
 // Sprite Struct
 typedef struct sprite {
     u8 ypos;
     u8 xpos;
+
     // 8x8 sprites: Tile number within pattern table selected from PPUCTRL
     // 8x16 sprites: selects pattern table from bit 0
     struct {
         u8 bank: 1;     // 0: $0000, 1: $1000 (only in 8x16 mode)
         u8 tile_num: 7; // tile num for top of sprite (bottom half gets next tile)
     } index;
+
     // Attributes
     struct {
         u8 palette: 2;  // palette for the sprite 
@@ -236,7 +238,8 @@ static void render_px()
         // TODO: Add in color emphasis and greyscale
 
         // NOTE: Debug
-        // if (scanline == 140) {
+        // if (cycle >= 12 && cycle <= 15) {
+        // if (scanline == 44) {
         //     col.red = 255;
         //     col.blue = 0;
         //     col.blue = 0;
@@ -326,10 +329,10 @@ void Ppu_Reset()
 #ifdef DEBUG
     CHECK_INIT;
 #endif
-    
+
     // setup initial state
     cycle = 0;
-    scanline = 0;
+    scanline = -1;
     al_first_write = true;
     ppudata_buf = 0;
     oddframe = false;
@@ -371,21 +374,23 @@ bool Ppu_Step(int clock_budget)
         }
 
         // Visible Scanlines
-        if (scanline <= 239 || scanline == 261) {
+        if (scanline <= 239 || scanline == -1) {
 
             // clear vblank
-            if (scanline == 261 && cycle == 1) {
+            if (scanline == -1 && cycle == 1) {
                 ppustatus.field.vblank = 0;
                 // TODO: Sprite overflow
             }
 
-            if ((cycle >= 1 && cycle <= 256) || cycle >= 321) {
+            if ((cycle >= 2 && cycle <= 258) || (cycle >= 321 && cycle <= 337)) {
                 shift_bgshifters();
 
-                u16 addr, hi;
+                u16 addr = 0;
+                u16 hi = 0;
                 // prepare next value to be loaded into shifter
                 switch ((cycle - 1) % 8) {
                 case 0:
+                    load_bgshifters();
                     // fetch nametable byte
                     nx_bgtile_id = Mem_PpuRead(0x2000 | (loopy_v.raw & 0xFFF));
                     break;
@@ -411,23 +416,27 @@ bool Ppu_Step(int clock_budget)
                 case 4:
                     // fetch lsb of next tile
                     addr = ppuctrl.field.bg_side << 12;
-                    addr += (nx_bgtile_id << 4);
+                    addr += ((u16) nx_bgtile_id << 4);
                     addr += loopy_v.field.fine_y;
                     nx_bgtile = Mem_PpuRead(addr);
                     break;
                 case 6:
                     // fetch msb of next tile
                     addr = ppuctrl.field.bg_side << 12;
-                    addr += (nx_bgtile_id << 4);
+                    addr += ((u16) nx_bgtile_id << 4);
                     addr += loopy_v.field.fine_y + 8; // offset one byte
                     hi = Mem_PpuRead(addr);
                     nx_bgtile |= (hi << 8);
                     break;
                 case 7:
                     inc_hori();
-                    load_bgshifters();
                     break;
                 }
+            }
+
+            if (cycle == 256) {
+                // increment vertical loopy
+                inc_vert();
             }
 
             if (cycle == 257) {
@@ -437,10 +446,9 @@ bool Ppu_Step(int clock_budget)
                     loopy_v.field.coarse_x = loopy_t.field.coarse_x;
                     loopy_v.field.x_nt     = loopy_t.field.x_nt;
                 }
-            } else if (cycle == 256) {
-                // increment vertical loopy
-                inc_vert();
-            } else if (scanline == 261 && (cycle >= 280 && cycle <= 304)) {
+            }
+
+            if (scanline == -1 && (cycle >= 280 && cycle <= 304)) {
                 // reset vertical loopy registers
                 if (ppumask.field.render_bg || ppumask.field.render_sprites) {
                     loopy_v.field.coarse_y = loopy_t.field.coarse_y;
@@ -464,8 +472,8 @@ bool Ppu_Step(int clock_budget)
         // Update Screen State
         if (cycle == 340) {
             cycle = 0;
-            if (scanline == 261) {
-                scanline = 0;
+            if (scanline == 260) {
+                scanline = -1;
                 oddframe = !oddframe;
                 frame_finished = true;
             } else {
@@ -614,6 +622,7 @@ void Ppu_Oamdma(u8 hi)
 //---------------------------------------------------------------
 // PPU Debug Display
 //---------------------------------------------------------------
+// Draw the Pattern Table into the Debug Display
 void Ppu_DrawPT(u16 table_id, u8 pal_id)
 {
     for (u16 ytile = 0; ytile < 16; ytile++) {
@@ -628,7 +637,7 @@ void Ppu_DrawPT(u16 table_id, u8 pal_id)
                 u8 tile_msb = Mem_PpuRead(addr + 8);
 
                 for (u16 col = 0; col < 8; col++) {
-                    u8 px = (tile_lsb & 0x1) + (tile_msb & 0x1);
+                    u8 px = ((tile_msb & 0x1) << 1) | (tile_lsb & 0x1);
                     // shift tile byte
                     tile_lsb >>= 1;
                     tile_msb >>= 1;
@@ -646,6 +655,39 @@ void Ppu_DrawPT(u16 table_id, u8 pal_id)
     }
 }
 
+// Draw a Nametable in the debug display
+void Ppu_DrawNT(u16 table_id, u8 pal_id)
+{
+    for (u16 y = 0; y < 240; y += 8) {
+        for (u16 x = 0; x < 256; x += 8) {
+            u16 offset = (y << 5) | x;
+            u8 tile_id = Mem_PpuRead(0x2000 | (table_id << 10) | offset);
+
+            for (u16 row = 0; row < 8; row++) {
+                u16 addr = table_id << 12;
+                addr += ((u16) tile_id << 4);
+                addr += row;
+                u8 tile_lsb = Mem_PpuRead(addr);
+                u8 tile_msb = Mem_PpuRead(addr + 8);
+
+                for (u16 col = 0; col < 8; col++) {
+                    // build pixel and shift tile byte
+                    u8 px0 = tile_lsb & 0x80 ? 1 : 0;
+                    u8 px1 = tile_msb & 0x80 ? 1 : 0;
+                    tile_lsb <<= 1;
+                    tile_msb <<= 1;
+                    u8 px = (px1 << 1) | px0;
+
+
+                    u8 color_id = Mem_PpuRead(0x3F00 + (pal_id << 2) + px);
+                    nes_color_t color = nes_colors[color_id & 0x3F];
+
+                    Vac_SetPxNt(table_id, x + col, y + row, color);
+                }
+            }
+        }
+    }
+}
 
 void Ppu_Dump()
 {

@@ -20,5 +20,6 @@ void Ppu_RegWrite(u8 val, u16 reg);
 void Ppu_Oamdma(u8 hi);
 void Ppu_Dump();
 void Ppu_DrawPT(u16 table_id, u8 pal_id);
+void Ppu_DrawNT(u16 table_id, u8 pal_id);
 
 #endif

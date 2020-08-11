@@ -127,19 +127,22 @@ void Mem_CpuWrite(u8 data, u16 addr)
         cartmem[addr] = data;
         return;
     }
+    
     // internal ram access
-    else if (addr <= 0x1FFF) {
+    if (addr <= 0x1FFF) {
         iram[addr & 0x7FF] = data;
         return;
     }
+    
     // ppu register access
-    else if (addr >= 0x2000 && addr <= 0x3FFF) {
+    if (addr >= 0x2000 && addr <= 0x3FFF) {
         // convert to 0-7 addr space and write
         Ppu_RegWrite(data, addr & 0x7);
         return;
     }
+    
     // apu/io access
-    else if (addr >= 0x4000 && addr <= 0x4017) {
+    if (addr >= 0x4000 && addr <= 0x4017) {
         // TODO read the correct apu/io reg
         switch (addr) {
         case 0x4014:
@@ -162,8 +165,9 @@ void Mem_CpuWrite(u8 data, u16 addr)
         // EXIT(1);
         return;
     }
+    
     // disabled apu/io access (not used)
-    else if (addr >= 0x4018 && addr <= 0x401F) {
+    if (addr >= 0x4018 && addr <= 0x401F) {
         WARNING("APU/IO test regs not available ($%04X)\n", addr);
         return;
     }
@@ -232,12 +236,14 @@ static u16 mirror(u16 addr)
 #endif
 
     enum mirror_mode mirror_mode = Cart_GetMirrorMode();
+    u16 old = 0;
     switch (mirror_mode) {
     case MIR_HORZ:
-        addr &= ~(0x4 << 8);
+        old = addr;
+        addr &= ~0x0400;
         break;
     case MIR_VERT:
-        addr &= ~(0x8 << 8);
+        addr &= ~0x0800;
         break;
     case MIR_4SCRN:
         ERROR("No support for 4 screen mirror mode!\n");
@@ -257,20 +263,23 @@ u8 Mem_PpuRead(u16 addr)
         addr = Cart_PpuMap(addr);
         return chrrom[addr];
     }
+
     // Nametable access
-    else if (addr >= 0x2000 && addr <= 0x2FFF) {
+    if (addr >= 0x2000 && addr <= 0x2FFF) {
         addr = mirror(addr);
         return vram[addr];
     }
+
     // Nametable mirror access
-    else if (addr >= 0x3000 && addr <= 0x3EFF) {
+    if (addr >= 0x3000 && addr <= 0x3EFF) {
         addr = mirror(addr - 0x1000);
         return vram[addr];
     }
+
     // pallete access
-    else if (addr >= 0x3F00 && addr <= 0x3FFF) {
+    if (addr >= 0x3F00 && addr <= 0x3FFF) {
         // adjust for mirrors
-        addr = (addr - 0x3F00) & 0xFF;
+        addr = (addr - 0x3F00) & 0x1F;
         // one byte mirrors
         if (addr == 0x10) {
             addr = 0x00;
@@ -301,22 +310,25 @@ void Mem_PpuWrite(u8 data, u16 addr)
         chrrom[addr] = data;
         return;
     }
+    
     // Nametable access
-    else if (addr >= 0x2000 && addr <= 0x2FFF) {
+    if (addr >= 0x2000 && addr <= 0x2FFF) {
         addr = mirror(addr);
         vram[addr] = data;
         return;
     }
+    
     // Nametable mirror access
-    else if (addr >= 0x3000 && addr <= 0x3EFF) {
+    if (addr >= 0x3000 && addr <= 0x3EFF) {
         addr = mirror(addr - 0x1000);
         vram[addr] = data;
         return;
     }
+    
     // pallete access
-    else if (addr >= 0x3F00 && addr <= 0x3FFF) {
+    if (addr >= 0x3F00 && addr <= 0x3FFF) {
         // adjust for mirrors
-        addr = (addr - 0x3F00) & 0xFF;
+        addr = (addr - 0x3F00) & 0x1F;
         // one byte mirrors
         if (addr == 0x10) {
             addr = 0x00;

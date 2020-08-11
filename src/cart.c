@@ -75,7 +75,6 @@ static ines_header_t read_ines_header(FILE *file)
     header.mapper_num = (flags6 >> 4) & 0xF;
     header.mapper_num |= (flags7 & 0xF0);
     // fill in rest of header
-    header.mapper_num = filebuf[i++];
     header.prgram_banks = filebuf[i++];
 
     return header;
@@ -168,7 +167,7 @@ u16 Cart_CpuMap(u16 addr)
     case 0:
         return cpu_map000(addr);
     default:
-        ERROR("Mapper (%u) not supported!", inesh.mapper_num);
+        ERROR("Mapper (%u) not supported!\n", inesh.mapper_num);
         EXIT(1);
     }
     // should not get here
@@ -185,7 +184,7 @@ u16 Cart_PpuMap(u16 addr)
     case 0:
         return ppu_map000(addr);
     default:
-        ERROR("Mapper (%u) not supported!", inesh.mapper_num);
+        ERROR("Mapper (%u) not supported!\n", inesh.mapper_num);
         EXIT(1);
     } 
     // should not get here
@@ -204,9 +203,9 @@ inline enum mirror_mode Cart_GetMirrorMode()
     }
 
     if (inesh.flags.mirror_mode) {
-        return MIR_HORZ;
-    } else {
         return MIR_VERT;
+    } else {
+        return MIR_HORZ;
     }
     // should not get here
     assert(0);

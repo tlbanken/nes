@@ -42,6 +42,7 @@ void Vac_Refresh();
 u16 Vac_Poll();
 void Vac_SetPx(int x, int y, nes_color_t color);
 void Vac_SetPxPt(int table_side, u16 x, u16 y, nes_color_t color);
+void Vac_SetPxNt(int table_side, u16 x, u16 y, nes_color_t color);
 void Vac_ClearScreen();
 unsigned int Vac_MsPassedFrom(unsigned int from);
 bool Vac_OneSecPassed();
