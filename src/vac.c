@@ -229,7 +229,9 @@ void Vac_Refresh()
     for (int y = 0; y < RES_Y; y++) {
         for (int x = 0; x < RES_X; x++) {
             // set color
-            nes_color_t color = vbuf[(y * RES_X) + x];
+            size_t col_id = (y * RES_X) + x;
+            assert(col_id < sizeof(vbuf));
+            nes_color_t color = vbuf[col_id];
             int rc = SDL_SetRenderDrawColor(renderer, color.red, color.green, color.blue, SDL_ALPHA_OPAQUE);
             if (rc != 0) {
                 SDL_PERROR;
@@ -252,7 +254,10 @@ void Vac_Refresh()
             for (int y = 0; y < 128; y++) {
                 for (int x = 0; x < 128; x++) {
                     // set color
-                    nes_color_t color = pt_vbuf[table_side][y*128 + x];
+                    int col_id = (y * 128) + x;
+                    assert(table_side < 2);
+                    assert(col_id < (128*128));
+                    nes_color_t color = pt_vbuf[table_side][col_id];
                     int rc = SDL_SetRenderDrawColor(renderer, color.red, color.green, color.blue, SDL_ALPHA_OPAQUE);
                     if (rc != 0) {
                         SDL_PERROR;

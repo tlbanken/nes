@@ -134,6 +134,7 @@ static u16 bgshifter_attr_hi;
 static u8 sprite_shifter_lo[8];
 static u8 sprite_shifter_hi[8];
 static u8 sprites_found = 0;
+static bool sprite0_loaded = false;
 
 // tile buffers
 static u8 nx_bgtile_id;
@@ -244,7 +245,8 @@ static void render_px()
     } 
 
     if (ppumask.field.render_sprites) {
-        for (u8 i = 0; i < sprites_found; i++) {
+        for (u16 i = 0; i < sprites_found; i++) {
+            assert((i << 2) < (u16) sizeof(oambuf));
             sprite_t *sprite = (sprite_t *)&oambuf[i << 2];
             if (sprite->xpos == 0) {
                 u8 px0 = sprite_shifter_lo[i] & 0x80 ? 1 : 0;
@@ -292,11 +294,13 @@ static void render_px()
             final_pal = bg_pal;
         }
 
-        if (sprite_num == 0) {
+        if (sprite_num == 0 && sprite0_loaded) {
             // sprite0 hit!
             ppustatus.field.sprite0_hit = 1;
         }
     }
+
+    // TODO: Render Left background/sprite checks! (Check ppumask)
 
     // get color
     u16 addr = 0x3F00;     // Pallete range
@@ -363,6 +367,7 @@ static void shift_shifters()
     // sprites
     if (ppumask.field.render_sprites && cycle >= 1 && cycle <= 257) {
         for (u16 i = 0; i < sprites_found; i++) {
+            assert((i << 2) < (u16) sizeof(oambuf));
             sprite_t *sprite = (sprite_t *)&oambuf[i << 2];
 
             // check if cycle has reached the sprite and only shift if it has
@@ -394,10 +399,12 @@ static void sprite_eval()
 {
     // clear oam buffer
     memset(oambuf, 0xFF, sizeof(oambuf));
+    sprite0_loaded = false;
 
     // search for first 8 sprites which belong on the next scanline
     u16 buf_i = 0;
     for (u16 i = 0; i < 256; i += 4) {
+        assert(i < (u16) sizeof(oam));
         u8 ypos = oam[i];
         int diff = (int) scanline - (int) ypos;
         if (diff >= 0 && diff < (ppuctrl.field.sprite_size ? 16 : 8)) {
@@ -406,9 +413,15 @@ static void sprite_eval()
 
             // check if all 8 sprites have already been found
             if (sprites_found > 8) {
+                sprites_found = 8;
                 // sprite overflow!
                 ppustatus.field.sprite_overflow = 1;
                 break;
+            }
+
+            // check if this is sprite0
+            if (i == 0) {
+                sprite0_loaded = true;
             }
 
             // copy over sprite
@@ -427,6 +440,7 @@ static void load_sprite_shifters()
 {
     for (u16 i = 0; i < sprites_found; i++) {
         // load sprite
+        assert((i << 2) < (u16) sizeof(oambuf));
         sprite_t *sprite = (sprite_t *)&oambuf[i << 2];
 
         u16 addr = 0;
