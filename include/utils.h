@@ -35,6 +35,7 @@ void Neslog_Init();
 void Neslog_Free();
 void Utils_SetExitHandler(void (*func)(int));
 void Utils_ExitWithHandler(int rc);
+unsigned char Utils_FlipByte(unsigned char b);
 char* op_to_str(u8 opcode);
 
 // error codes

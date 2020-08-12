@@ -10,6 +10,8 @@
 #include <vac.h>
 #include <SDL.h>
 
+#define SDL_PERROR ERROR("SDL ERROR: %s\n", SDL_GetError())
+
 #define RES_X 256
 #define RES_Y 240
 #define DBG_RES_X (128*2 + 4)
@@ -39,7 +41,10 @@ static int scale_dbg(int val)
 static void reset_draw_color()
 {
     int rc = SDL_SetRenderDrawColor(renderer, 0x77, 0x85, 0x8C, SDL_ALPHA_OPAQUE);
-    assert(rc == 0);
+    if (rc != 0) {
+        SDL_PERROR;
+        EXIT(1);
+    }
 }
 
 static u16 set_key(SDL_Keycode keycode, u16 keystate)
@@ -146,7 +151,7 @@ static u16 unset_key(SDL_Keycode keycode, u16 keystate)
 
 void Vac_Init(const char *title, bool debug_display)
 {
-    pxscale = 3;
+    pxscale = debug_display ? 3 : 4;
     debug_on = debug_display;
 
     int rc;
@@ -201,12 +206,13 @@ u16 Vac_Poll()
 
             // IDK why but for somereason nes doesn't register a held-down
             // key until it sees a change, so force that change
-            if (!(keystate & 0xFF)) {
-                keystate = set_key(keycode, keystate);
-            }
-            else {
-                keystate &= 0xFF00;
-            }
+            // if (!(keystate & 0xFF)) {
+            //     keystate = set_key(keycode, keystate);
+            // }
+            // else {
+            //     keystate &= 0xFF00;
+            // }
+            keystate = set_key(keycode, keystate);
             break;
         case SDL_KEYUP:
             keycode = e.key.keysym.sym;
@@ -225,7 +231,10 @@ void Vac_Refresh()
             // set color
             nes_color_t color = vbuf[(y * RES_X) + x];
             int rc = SDL_SetRenderDrawColor(renderer, color.red, color.green, color.blue, SDL_ALPHA_OPAQUE);
-            assert(rc == 0);
+            if (rc != 0) {
+                SDL_PERROR;
+                EXIT(1);
+            }
 
             SDL_Rect rectangle;
             rectangle.x = scale(x);
@@ -245,7 +254,10 @@ void Vac_Refresh()
                     // set color
                     nes_color_t color = pt_vbuf[table_side][y*128 + x];
                     int rc = SDL_SetRenderDrawColor(renderer, color.red, color.green, color.blue, SDL_ALPHA_OPAQUE);
-                    assert(rc == 0);
+                    if (rc != 0) {
+                        SDL_PERROR;
+                        EXIT(1);
+                    }
 
                     SDL_Rect rect;
                     rect.x = scale_dbg(x + 1) + scale(RES_X) + (scale_dbg(128) * table_side

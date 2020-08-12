@@ -7,6 +7,8 @@
  * Picture Processing Unit for the NES.
  */
 
+#include <string.h>
+
 #include <utils.h>
 #include <mem.h>
 #include <vac.h>
@@ -15,28 +17,26 @@
 #define LOG(fmt, ...) Neslog_Log(LID_PPU, fmt, ##__VA_ARGS__);
 static bool is_init = false;
 #define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
-// Object Attrubute Memory (64 sprites)
+
+// Object Attrubute Memory (holds 64 sprites)
 static u8 oam[64*4] = {0};
 // Sprite Struct
 typedef struct sprite {
     u8 ypos;
-    u8 xpos;
 
     // 8x8 sprites: Tile number within pattern table selected from PPUCTRL
     // 8x16 sprites: selects pattern table from bit 0
-    struct {
-        u8 bank: 1;     // 0: $0000, 1: $1000 (only in 8x16 mode)
-        u8 tile_num: 7; // tile num for top of sprite (bottom half gets next tile)
-    } index;
+    u8 id;
 
-    // Attributes
-    struct {
-        u8 palette: 2;  // palette for the sprite 
-        u8 unused: 3;
-        u8 priority: 1; // 0: in front of background, 1: behind
-        u8 flip_h: 1;   // 0: no flip, 1: flip
-        u8 flip_v: 1;   // 0: no flip, 1: flip
-    } attr;
+    // Attributes Bit fields
+    //     palette: 2;  // palette for the sprite 
+    //     unused: 3;
+    //     priority: 1; // 0: in front of background, 1: behind
+    //     flip_h: 1;   // 0: no flip, 1: flip
+    //     flip_v: 1;   // 0: no flip, 1: flip
+    u8 attr;
+
+    u8 xpos;
 } sprite_t;
 // Secondary OAM (holds 8 sprites)
 static u8 oambuf[8*4];
@@ -130,10 +130,10 @@ static u16 bgshifter_ptrn_hi;
 static u16 bgshifter_attr_lo;
 static u16 bgshifter_attr_hi;
 
-// sprite shifters
-// static u8 sprite_shifters[8];
-// static u8 sprite_attrs[8];
-// static u8 sprite_counters[8];
+// sprites
+static u8 sprite_shifter_lo[8];
+static u8 sprite_shifter_hi[8];
+static u8 sprites_found = 0;
 
 // tile buffers
 static u8 nx_bgtile_id;
@@ -219,41 +219,102 @@ static void render_px()
         return;
     }
 
+    // palette choice
+    u8 bg_pal = 0;
+    u8 sprite_pal = 0;
+    u8 final_pal = 0;
+
+    // pixel choice
+    u8 bg_px = 0;
+    u8 sprite_px = 0;
+    u8 final_px = 0;
+
+    bool sprite_veto = false;
+    u8 sprite_num = 1;
+
     if (ppumask.field.render_bg) {
         u16 fine_bit = 0x8000 >> fine_x;
         u8 px0 = bgshifter_ptrn_lo & fine_bit ? 1 : 0;
         u8 px1 = bgshifter_ptrn_hi & fine_bit ? 1 : 0;
-        u8 bg_px = (px1 << 1) | px0;
+        bg_px = (px1 << 1) | px0;
 
         u8 pal0 = bgshifter_attr_lo & fine_bit ? 1 : 0;
         u8 pal1 = bgshifter_attr_hi & fine_bit ? 1 : 0;
-        u8 bg_pal = (pal1 << 1) | pal0;
+        bg_pal = (pal1 << 1) | pal0;
+    } 
 
-        // get color
-        u16 addr = 0x3F00;     // Pallete range
-        addr += (bg_pal << 2); // 4 byte sized palletes
-        addr += bg_px;         // pixel index
-        u8 col_id = Mem_PpuRead(addr) & 0x3F;
-        nes_color_t col = nes_colors[col_id];
-        // TODO: Add in color emphasis and greyscale
+    if (ppumask.field.render_sprites) {
+        for (u8 i = 0; i < sprites_found; i++) {
+            sprite_t *sprite = (sprite_t *)&oambuf[i << 2];
+            if (sprite->xpos == 0) {
+                u8 px0 = sprite_shifter_lo[i] & 0x80 ? 1 : 0;
+                u8 px1 = sprite_shifter_hi[i] & 0x80 ? 1 : 0;
+                sprite_px = (px1 << 1) | px0;
 
-        // NOTE: Debug
-        // if (cycle >= 12 && cycle <= 15) {
-        // if (scanline == 44) {
-        //     col.red = 255;
-        //     col.blue = 0;
-        //     col.blue = 0;
-        // }
-
-        // draw the pixel
-        Vac_SetPx(cycle, scanline, col);
-    } else if (loopy_v.raw >= 0x3F00 && loopy_v.raw <= 0x3FFF) {
-        // pallete hack
-        // https://wiki.nesdev.com/w/index.php/PPU_palettes
-        u8 col_id = Mem_PpuRead(loopy_v.raw) & 0x3F;
-        nes_color_t col = nes_colors[col_id];
-        Vac_SetPx(cycle, scanline, col);
+                // check if sprite is rendered
+                if (sprite_px != 0) {
+                    // sprite pallete is offset by 4 from bg pallette
+                    sprite_pal = (sprite->attr & 0x03) + 0x04;
+                    sprite_veto = (sprite->attr & 0x20) == 0;
+                    sprite_num = i;
+                    break;
+                }
+            }
+        }
     }
+
+    // if (!ppumask.field.render_bg && !ppumask.field.render_sprites) {
+    //     if (loopy_v.raw >= 0x3F00 && loopy_v.raw <= 0x3FFF) {
+    //         // pallete hack
+    //         // https://wiki.nesdev.com/w/index.php/PPU_palettes
+    //         u8 col_id = Mem_PpuRead(loopy_v.raw) & 0x3F;
+    //         col = nes_colors[col_id];
+    //     }
+    // } else {
+
+    // determine priority
+    if (!bg_px && !sprite_px) {
+        final_px = 0x00;
+        final_pal = 0x00;
+    } else if (!bg_px && sprite_px) {
+        final_px = sprite_px;
+        final_pal = sprite_pal;
+    } else if (bg_px && !sprite_px) {
+        final_px = bg_px;
+        final_pal = bg_pal;
+    } else {
+        // both background and sprite pixels non-zero
+        if (sprite_veto) {
+            final_px = sprite_px;
+            final_pal = sprite_pal;
+        } else {
+            final_px = bg_px;
+            final_pal = bg_pal;
+        }
+
+        if (sprite_num == 0) {
+            // sprite0 hit!
+            ppustatus.field.sprite0_hit = 1;
+        }
+    }
+
+    // get color
+    u16 addr = 0x3F00;     // Pallete range
+    addr += (final_pal << 2); // 4 byte sized palletes
+    addr += final_px;         // pixel index
+    u8 col_id = Mem_PpuRead(addr) & 0x3F;
+    nes_color_t col = nes_colors[col_id];
+    // TODO: Add in color emphasis and greyscale
+
+    // NOTE: Debug
+    // if (cycle >= 12 && cycle <= 15) {
+    // if (scanline == 44) {
+    //     col.red = 255;
+    //     col.green = 0;
+    //     col.blue = 0;
+    // }
+    // draw the pixel
+    Vac_SetPx(cycle, scanline, col);
 }
 
 static void inc_hori()
@@ -289,13 +350,29 @@ static void inc_vert()
     }
 }
 
-static void shift_bgshifters()
+static void shift_shifters()
 {
+    // background
     if (ppumask.field.render_bg) {
         bgshifter_ptrn_lo <<= 1;
         bgshifter_ptrn_hi <<= 1;
         bgshifter_attr_lo <<= 1;
         bgshifter_attr_hi <<= 1;
+    }
+
+    // sprites
+    if (ppumask.field.render_sprites && cycle >= 1 && cycle <= 257) {
+        for (u16 i = 0; i < sprites_found; i++) {
+            sprite_t *sprite = (sprite_t *)&oambuf[i << 2];
+
+            // check if cycle has reached the sprite and only shift if it has
+            if (sprite->xpos > 0) {
+                sprite->xpos--;
+            } else {
+                sprite_shifter_lo[i] <<= 1;
+                sprite_shifter_hi[i] <<= 1;
+            }
+        }
     }
 }
 
@@ -311,6 +388,96 @@ static void load_bgshifters()
     // attribute bits
     bgshifter_attr_lo = (bgshifter_attr_lo & 0xFF00) | (nx_bgtile_attr & 0x1 ? 0xFF : 0x00);
     bgshifter_attr_hi = (bgshifter_attr_hi & 0xFF00) | (nx_bgtile_attr & 0x2 ? 0xFF : 0x00);
+}
+
+static void sprite_eval()
+{
+    // clear oam buffer
+    memset(oambuf, 0xFF, sizeof(oambuf));
+
+    // search for first 8 sprites which belong on the next scanline
+    u16 buf_i = 0;
+    for (u16 i = 0; i < 256; i += 4) {
+        u8 ypos = oam[i];
+        int diff = (int) scanline - (int) ypos;
+        if (diff >= 0 && diff < (ppuctrl.field.sprite_size ? 16 : 8)) {
+            // sprite hit!
+            sprites_found++;
+
+            // check if all 8 sprites have already been found
+            if (sprites_found > 8) {
+                // sprite overflow!
+                ppustatus.field.sprite_overflow = 1;
+                break;
+            }
+
+            // copy over sprite
+            assert(buf_i + 3 <= (u16) sizeof(oambuf));
+            assert(i + 3 <= (u16) sizeof(oam));
+            oambuf[buf_i+0] = oam[i+0];
+            oambuf[buf_i+1] = oam[i+1];
+            oambuf[buf_i+2] = oam[i+2];
+            oambuf[buf_i+3] = oam[i+3];
+            buf_i += 4;
+        }
+    } 
+}
+
+static void load_sprite_shifters()
+{
+    for (u16 i = 0; i < sprites_found; i++) {
+        // load sprite
+        sprite_t *sprite = (sprite_t *)&oambuf[i << 2];
+
+        u16 addr = 0;
+        // first determine size of sprite
+        if (ppuctrl.field.sprite_size == 0) {
+            // 8x8
+            // read attribute from pattern table by choosing the table
+            // side, then choosing the tile in the table (using id)
+            addr = ((u16) ppuctrl.field.sprite_side << 12);
+            addr |= (sprite->id << 4);
+
+            // Now determine orientation to figure out the last offset
+            if ((sprite->attr & 0x80) == 0) {
+                // normal vertically
+                addr |= (scanline - sprite->ypos);
+            } else {
+                // flipped Vertically
+                addr |= (7 - (scanline - sprite->ypos));
+            }
+        } else {
+            // 8x16
+            addr = ((u16) (sprite->id & 0x01) << 12);
+            // determine if in top-half of sprite or bottom-half
+            if (scanline - sprite->ypos < 8) {
+                addr |= ((sprite->id & 0xFE) << 4);
+            } else {
+                addr |= (((sprite->id & 0xFE) + 1) << 4);
+            }
+
+            // Now determine orientation
+            if ((sprite->attr & 0x80) == 0) {
+                // normal vertically
+                addr |= ((scanline - sprite->ypos) & 0x07);
+            } else {
+                // flipped Vertically
+                addr |= ((7 - (scanline - sprite->ypos)) & 0x07);
+            }
+        } // end of addr calc
+
+        u8 ptrn_lo = Mem_PpuRead(addr);
+        u8 ptrn_hi = Mem_PpuRead(addr + 8);
+
+        // determine if horz flip needed
+        if (sprite->attr & 0x40) {
+            ptrn_lo = Utils_FlipByte(ptrn_lo);
+            ptrn_hi = Utils_FlipByte(ptrn_hi);
+        }
+
+        sprite_shifter_lo[i] = ptrn_lo;
+        sprite_shifter_hi[i] = ptrn_hi;
+    }
 }
 
 void Ppu_Init()
@@ -353,6 +520,12 @@ void Ppu_Reset()
     bgshifter_attr_hi = 0;
     nx_bgtile_id = 0;
     nx_bgtile_attr = 0;
+
+    memset(sprite_shifter_lo, 0, 8);
+    memset(sprite_shifter_hi, 0, 8);
+    sprites_found = 0;
+    memset(oambuf, 0xFF, sizeof(oambuf));
+    memset(oam, 0xFF, sizeof(oam));
 }
 
 bool Ppu_Step(int clock_budget)
@@ -376,14 +549,15 @@ bool Ppu_Step(int clock_budget)
         // Visible Scanlines
         if (scanline <= 239 || scanline == -1) {
 
-            // clear vblank
+            // clear vblank and sprite flags
             if (scanline == -1 && cycle == 1) {
                 ppustatus.field.vblank = 0;
-                // TODO: Sprite overflow
+                ppustatus.field.sprite_overflow = 0;
+                ppustatus.field.sprite0_hit = 0;
             }
 
             if ((cycle >= 2 && cycle <= 258) || (cycle >= 321 && cycle <= 337)) {
-                shift_bgshifters();
+                shift_shifters();
 
                 u16 addr = 0;
                 u16 hi = 0;
@@ -457,6 +631,23 @@ bool Ppu_Step(int clock_budget)
                 }
             }
 
+            // *** Sprites ***
+            // based on Javid's implementation:
+            // https://www.youtube.com/watch?v=cksywUTZxlY&t=363s
+
+            // simple sprite evaluation (not cycle accurate)
+            // NOTE: Maybe spread out workload across cycles??
+            if (cycle == 257 && scanline >= 0) {
+                sprites_found = 0;
+                sprite_eval();
+            }
+            
+            // find corresponding pattern attributes for sprites
+            if (cycle == 340) {
+                load_sprite_shifters();
+            }
+            // *** END Sprites ***
+
         } else { // NonVisible Scanlines
 
             // set vblank flag
@@ -467,6 +658,7 @@ bool Ppu_Step(int clock_budget)
                 }
             }
         }
+
 
         render_px();
         // Update Screen State
@@ -522,6 +714,7 @@ u8 Ppu_RegRead(u16 reg)
         // } else {
         //     data = oam[oamaddr];
         // }
+        data = oam[oamaddr];
         // TODO
         break;
     case 5: // PPUSCROLL
@@ -539,7 +732,7 @@ u8 Ppu_RegRead(u16 reg)
     case 7: // PPUDATA
         data = ppudata_buf;
         ppudata_buf = Mem_PpuRead(loopy_v.raw);
-        if (loopy_v.raw >= 0x3F00) { // no delay from CHR-ROM
+        if (loopy_v.raw >= 0x3F00 && loopy_v.raw <= 0x3FFF) { // no delay from CHR-ROM
             data = ppudata_buf;
         }
         loopy_v.raw += (ppuctrl.field.vram_incr ? 32 : 1);
@@ -655,39 +848,6 @@ void Ppu_DrawPT(u16 table_id, u8 pal_id)
     }
 }
 
-// Draw a Nametable in the debug display
-void Ppu_DrawNT(u16 table_id, u8 pal_id)
-{
-    for (u16 y = 0; y < 240; y += 8) {
-        for (u16 x = 0; x < 256; x += 8) {
-            u16 offset = (y << 5) | x;
-            u8 tile_id = Mem_PpuRead(0x2000 | (table_id << 10) | offset);
-
-            for (u16 row = 0; row < 8; row++) {
-                u16 addr = table_id << 12;
-                addr += ((u16) tile_id << 4);
-                addr += row;
-                u8 tile_lsb = Mem_PpuRead(addr);
-                u8 tile_msb = Mem_PpuRead(addr + 8);
-
-                for (u16 col = 0; col < 8; col++) {
-                    // build pixel and shift tile byte
-                    u8 px0 = tile_lsb & 0x80 ? 1 : 0;
-                    u8 px1 = tile_msb & 0x80 ? 1 : 0;
-                    tile_lsb <<= 1;
-                    tile_msb <<= 1;
-                    u8 px = (px1 << 1) | px0;
-
-
-                    u8 color_id = Mem_PpuRead(0x3F00 + (pal_id << 2) + px);
-                    nes_color_t color = nes_colors[color_id & 0x3F];
-
-                    Vac_SetPxNt(table_id, x + col, y + row, color);
-                }
-            }
-        }
-    }
-}
 
 void Ppu_Dump()
 {

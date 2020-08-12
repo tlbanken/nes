@@ -23,38 +23,34 @@ void Mem_Init()
     is_init = true;
 }
 
+// **********************************************************************
 // *** CPU ADDRESS SPACE ***
-
-// Memory map for the cpu address space
-enum cpu_memmap {
-    // CPU internal ram (mirrored)
-    MC_IRAM_START = 0x0000,
-    MC_IRAM_END   = 0x1FFF,
-    MC_IRAM_SIZE  = (2*1024),
-
-    // PPU registers (mirrored)
-    MC_PPU_START = 0x2000,
-    MC_PPU_END   = 0x3FFF,
-    MC_PPU_SIZE  = 8,
-
-    // APU and IO regs
-    MC_APU_IO_START = 0x4000,
-    MC_APU_IO_END   = 0x4017,
-    MC_APU_IO_SIZE  = 24,
-
-    // Disabled apu and io regs (may be used in test mode?)
-    MC_APU_IO_TEST_START = 0x4018,
-    MC_APU_IO_TEST_END   = 0x401F,
-    MC_APU_IO_TEST_SIZE  = 8,
-
-    // Cartridge Space
-    MC_CART_START = 0x4020,
-    MC_CART_END   = 0xFFFF,
-    MC_CART_SIZE  = (MC_CART_END - MC_CART_START + 1)
-};
-static u8 iram[MC_IRAM_SIZE] = {0};
-static u8 cartmem[MC_CART_SIZE] = {0};
-static u8 controller[2];
+//      CPU Memory Map
+// -----------------------
+// |   0x0000 - 0x1FFF   |
+// |   IRAM (Mirrored)   |
+// |       (2 KB)        |
+// -----------------------
+// |   0x2000 - 0x3FFF   |
+// | PPU Regs (Mirrored) |
+// |       (8 B)         |
+// -----------------------
+// |   0x4000 - 0x4017   |
+// |     APU/IO Regs     |
+// |       (24 B)        |
+// -----------------------
+// |   0x4018 - 0x401F   |
+// | TEST APU/IO (unused)|
+// |       (8 B)         |
+// -----------------------
+// |   0x4020 - 0xFFFF   |
+// |   Cartridge Space   |
+// |     (49.120 KB)     |
+// -----------------------
+// **********************************************************************
+static u8 iram[2*1024] = {0};
+static u8 cartmem[0xBFE0] = {0};
+static u8 controller[2] = {0};
 
 u8 Mem_CpuRead(u16 addr)
 {
@@ -65,19 +61,23 @@ u8 Mem_CpuRead(u16 addr)
     if (addr >= 0x4020) {
         addr = Cart_CpuMap(addr);
         addr -= 0x4020;
+        assert(addr < sizeof(cartmem));
         return cartmem[addr];
     }
+
     // internal ram access
-    else if (addr <= 0x1FFF) {
+    if (addr <= 0x1FFF) {
         return iram[addr & 0x7FF];
     }
+
     // ppu register access
-    else if (addr >= 0x2000 && addr <= 0x3FFF) {
+    if (addr >= 0x2000 && addr <= 0x3FFF) {
         // convert to 0-7 addr space and read
         return Ppu_RegRead(addr & 0x7);
     }
+
     // apu/io reads
-    else if (addr >= 0x4000 && addr <= 0x4017) {
+    if (addr >= 0x4000 && addr <= 0x4017) {
         // TODO read the correct apu/io reg
         u16 res;
         switch (addr) {
@@ -97,17 +97,16 @@ u8 Mem_CpuRead(u16 addr)
             WARNING("APU/IO reg not available ($%04X)\n", addr);
             break;
         }
-        // EXIT(1);
         return 0;
     }
+
     // disabled apu/io reads
-    else if (addr >= 0x4018 && addr <= 0x401F) {
+    if (addr >= 0x4018 && addr <= 0x401F) {
         // TODO ???
         WARNING("APU/IO test regs not available ($%04X)\n", addr);
         // EXIT(1);
         return 0;
     }
-
 
     // Should not get here
     ERROR("Unknown cpu read request addr ($%04X)\n", addr);
@@ -124,6 +123,7 @@ void Mem_CpuWrite(u8 data, u16 addr)
     if (addr >= 0x4020) {
         addr = Cart_CpuMap(addr);
         addr -= 0x4020;
+        assert(addr < sizeof(cartmem));
         cartmem[addr] = data;
         return;
     }
@@ -178,54 +178,30 @@ void Mem_CpuWrite(u8 data, u16 addr)
     EXIT(1);
 }
 
+// **********************************************************************
 // *** PPU ADDRESS SPACE ***
-// Memory map for the ppu address space
-enum ppu_memmap {
-    // Pattern table found on CHR-ROM from cartridge
-    MP_PT_START = 0x0000,
-    MP_PT_END   = 0x1FFF,
-    MP_PT_SIZE  = (8*1024),
-
-    // Nametables stored on VRAM
-    MP_NT_START = 0x2000,
-    MP_NT_END   = 0x2FFF,
-    MP_NT_SIZE  = (4*1024),
-
-    // Usually a mirror of the nametables up to $2EFF
-    MP_NT_MIR_START = 0x3000,
-    MP_NT_MIR_END   = 0x3EFF,
-    MP_NT_MIR_SIZE  = (MP_NT_MIR_END - MP_NT_MIR_START + 1),
-
-    // Pallete Control
-    MP_PAL_START = 0x3F00,
-    MP_PAL_END   = 0x3FFF,
-    MP_PAL_SIZE  = 256
-};
-static u8 chrrom[(8*1024)] = {0};
+//      PPU Memory Map
+// -----------------------
+// |   0x0000 - 0x1FFF   |
+// |   Pattern Tables    |
+// |       (8 KB)        |
+// -----------------------
+// |   0x2000 - 0x2FFF   |
+// |      Nametables     |
+// |       (4 KB)        |
+// -----------------------
+// |   0x3000 - 0x3EFF   |
+// |  Nametable Mirrors  |
+// |       (3,839 B)     |
+// -----------------------
+// |   0x3F00 - 0x3FFF   |
+// |   Palette Control   |
+// |       (256 B)       |
+// -----------------------
+// **********************************************************************
+static u8 ptrnmem[(8*1024)] = {0};
 static u8 vram[(4*1024)] = {0};
 static u8 palmem[256] = {0};
-
-// Name tables
-enum NT_MAP {
-    // tile info
-    NT_NUM_TILES = 32,
-
-    // table addr
-    NT_TOPL = 0x2000,
-    NT_TOPR = 0x2400,
-    NT_BOTL = 0x2800,
-    NT_BOTR = 0x2C00,
-    NT_SIZE = 1024 // 1KB
-};
-
-// Attribute tables
-enum AT_MAP {
-    AT_TOPL = 0x23C0,
-    AT_TOPR = 0x27C0,
-    AT_BOTL = 0x2BC0,
-    AT_BOTR = 0x2FC0,
-    AT_SIZE = 64
-};
 
 
 static u16 mirror(u16 addr)
@@ -236,10 +212,8 @@ static u16 mirror(u16 addr)
 #endif
 
     enum mirror_mode mirror_mode = Cart_GetMirrorMode();
-    u16 old = 0;
     switch (mirror_mode) {
     case MIR_HORZ:
-        old = addr;
         addr &= ~0x0400;
         break;
     case MIR_VERT:
@@ -261,18 +235,21 @@ u8 Mem_PpuRead(u16 addr)
     // Pattern table access
     if (addr <= 0x1FFF) {
         addr = Cart_PpuMap(addr);
-        return chrrom[addr];
+        assert(addr < sizeof(ptrnmem));
+        return ptrnmem[addr];
     }
 
     // Nametable access
     if (addr >= 0x2000 && addr <= 0x2FFF) {
         addr = mirror(addr);
+        assert(addr < sizeof(vram));
         return vram[addr];
     }
 
     // Nametable mirror access
     if (addr >= 0x3000 && addr <= 0x3EFF) {
         addr = mirror(addr - 0x1000);
+        assert(addr < sizeof(vram));
         return vram[addr];
     }
 
@@ -290,6 +267,7 @@ u8 Mem_PpuRead(u16 addr)
         } else if (addr == 0x1C) {
             addr = 0x0C;
         }
+        assert(addr < sizeof(palmem));
         return palmem[addr];
     }
 
@@ -307,13 +285,15 @@ void Mem_PpuWrite(u8 data, u16 addr)
     // Pattern table access
     if (addr <= 0x1FFF) {
         addr = Cart_PpuMap(addr);
-        chrrom[addr] = data;
+        assert(addr < sizeof(ptrnmem));
+        ptrnmem[addr] = data;
         return;
     }
     
     // Nametable access
     if (addr >= 0x2000 && addr <= 0x2FFF) {
         addr = mirror(addr);
+        assert(addr < sizeof(vram));
         vram[addr] = data;
         return;
     }
@@ -321,6 +301,7 @@ void Mem_PpuWrite(u8 data, u16 addr)
     // Nametable mirror access
     if (addr >= 0x3000 && addr <= 0x3EFF) {
         addr = mirror(addr - 0x1000);
+        assert(addr < sizeof(vram));
         vram[addr] = data;
         return;
     }
@@ -339,6 +320,7 @@ void Mem_PpuWrite(u8 data, u16 addr)
         } else if (addr == 0x1C) {
             addr = 0x0C;
         }
+        assert(addr < sizeof(palmem));
         palmem[addr] = data;
         return;
     }
@@ -363,7 +345,7 @@ void Mem_Dump()
         ERROR("Failed to dump IRAM\n");
         return;
     }
-    fwrite(iram, 1, MC_IRAM_SIZE, ofile);
+    fwrite(iram, 1, sizeof(iram), ofile);
     fclose(ofile);
     ofile = NULL;
 
@@ -374,19 +356,19 @@ void Mem_Dump()
         ERROR("Failed to dump PRG-ROM\n");
         return;
     }
-    fwrite(cartmem, 1, MC_CART_SIZE, ofile);
+    fwrite(cartmem, 1, sizeof(cartmem), ofile);
     fclose(ofile);
     ofile = NULL;
 
 
-    // dump chrrom
+    // dump ptrnmem
     ofile = fopen("chr-rom.dump", "wb");
     if (ofile == NULL) {
         perror("fopen");
         ERROR("Failed to dump CHR-ROM\n");
         return;
     }
-    fwrite(chrrom, 1, MP_PT_SIZE, ofile);
+    fwrite(ptrnmem, 1, sizeof(ptrnmem), ofile);
     fclose(ofile);
     ofile = NULL;
 
@@ -397,7 +379,7 @@ void Mem_Dump()
         ERROR("Failed to dump VRAM\n");
         return;
     }
-    fwrite(vram, 1, MP_NT_SIZE, ofile);
+    fwrite(vram, 1, sizeof(vram), ofile);
     fclose(ofile);
     ofile = NULL;
 
@@ -408,7 +390,7 @@ void Mem_Dump()
         ERROR("Failed to dump PALLETE MEM\n");
         return;
     }
-    fwrite(palmem, 1, MP_PAL_SIZE, ofile);
+    fwrite(palmem, 1, sizeof(palmem), ofile);
     fclose(ofile);
     ofile = NULL;
 }

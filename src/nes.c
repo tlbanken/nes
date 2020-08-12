@@ -60,6 +60,7 @@ static void run(const char *title, bool dbg_mode)
     bool frame_finished = false;
     u8 pal_id = 1;
     while (true) {
+        // poll keyboard
         u16 kc = Vac_Poll();
         if (kc & KEY_PAUSE) {
             paused = true;
@@ -73,6 +74,7 @@ static void run(const char *title, bool dbg_mode)
             return;
         }
 
+        // update palette for debug display
         if ((kc & KEY_PAL_CHANGE) && dbg_mode) {
             static unsigned int last_pal_update = 0;
             unsigned int passed = 0;
@@ -82,20 +84,19 @@ static void run(const char *title, bool dbg_mode)
             }
         }
 
-        // execution of cpu and ppu
+        // execution of cpu, ppu, and apu
         if (!paused || (kc & KEY_STEP) || (frame_mode && !frame_finished)) {
             // if we aren't in step mode, we advance cpu n many cycles
             if (kc & KEY_STEP) {
                 cycles = Cpu_Step();
-                frame_finished = Ppu_Step(3 * cycles);
             } else {
                 while (cycles < 1) {
                     cycles += Cpu_Step();
                 }
-                frame_finished = Ppu_Step(3 * cycles);
             }
+            frame_finished = Ppu_Step(3 * cycles);
+            // TODO: APU
             cycles = 0;
-            // rounds++;
         }
 
         // change pallete on debug display
@@ -111,9 +112,6 @@ static void run(const char *title, bool dbg_mode)
             if (dbg_mode) {
                 Ppu_DrawPT(0, pal_id - 1);
                 Ppu_DrawPT(1, pal_id - 1);
-
-                // Ppu_DrawNT(0, pal_id - 1);
-                // Ppu_DrawNT(1, pal_id - 1);
             }
 
             frame_finished = false;
