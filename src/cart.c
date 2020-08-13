@@ -94,10 +94,10 @@ static ines_header_t read_ines_header(FILE *file)
 }
 
 // mapper handlers
-static mapper_func_t map_cpuwrite = NULL;
-static mapper_func_t map_cpuread  = NULL;
-static mapper_func_t map_ppuwrite = NULL;
-static mapper_func_t map_ppuread  = NULL;
+static mapper_wfunc_t map_cpuwrite = NULL;
+static mapper_rfunc_t map_cpuread  = NULL;
+static mapper_wfunc_t map_ppuwrite = NULL;
+static mapper_rfunc_t map_ppuread  = NULL;
 static mapper_init_t map_init     = NULL;
 
 static void setup_mapper_handlers(u8 mapper_num)
@@ -109,6 +109,13 @@ static void setup_mapper_handlers(u8 mapper_num)
         map_cpuread  = Map000_CpuRead;
         map_ppuwrite = Map000_PpuWrite;
         map_ppuread  = Map000_PpuRead;
+        break;
+    case 2:
+        map_init     = Map002_Init;
+        map_cpuwrite = Map002_CpuWrite;
+        map_cpuread  = Map002_CpuRead;
+        map_ppuwrite = Map002_PpuWrite;
+        map_ppuread  = Map002_PpuRead;
         break;
     default:
         ERROR("Mapper (%u) not supported!\n", mapper_num);
@@ -169,12 +176,14 @@ void Cart_Load(const char *path)
     chrrom_size = inesh.chrrom_banks * CHRROM_BANK_SIZE;
     if (chrrom_size == 0) {
         // TODO: Figure out CHR-RAM situation
-        WARNING("CHR-ROM Bank size is ZERO! Maybe it uses CHR-RAM??\n");
+        INFO("CHR-ROM Bank size is ZERO! Assuming CHR-RAM of 8KB\n");
+        // for now, assume max size??
+        chrrom_size = (8*1024);
     }
     // assert(chrrom_size != 0);
 
     // initialize memory
-    cartmem_size = prgrom_size + (0x8000 - 0x4020 + 1);
+    cartmem_size = prgrom_size + (0x8000 - 0x4020);
     cartmem = malloc(cartmem_size);
     chrrom = malloc(chrrom_size);
     if (cartmem == NULL || chrrom == NULL) {
@@ -193,6 +202,9 @@ void Cart_Load(const char *path)
     map_init(inesh.prgrom_banks, inesh.chrrom_banks);
 
     // TODO the rare extensions
+
+    INFO("PRG-ROM Size: %lu (%lu KB) (%u Banks)\n", prgrom_size, prgrom_size / 1024, inesh.prgrom_banks);
+    INFO("CHR-ROM/RAM Size: %lu (%lu KB)\n", chrrom_size, chrrom_size / 1024);
     INFO("%s loaded successfully!\n", path);
     fclose(romfile);
 }
@@ -203,10 +215,11 @@ u8 Cart_CpuRead(u16 addr)
     CHECK_INIT;
     assert(map_cpuread != NULL);
 #endif
-    bool allowed = map_cpuread(&addr);
+    u32 maddr = addr;
+    bool allowed = map_cpuread(&maddr);
     if (allowed) {
-        assert((size_t)(addr - 0x4020) < cartmem_size);
-        return cartmem[addr - 0x4020];
+        assert((size_t)(maddr - 0x4020) < cartmem_size);
+        return cartmem[maddr - 0x4020];
     }
     return 0;
 }
@@ -217,10 +230,11 @@ void Cart_CpuWrite(u8 data, u16 addr)
     CHECK_INIT;
     assert(map_cpuwrite != NULL);
 #endif
-    bool allowed = map_cpuwrite(&addr);
+    u32 maddr = addr;
+    bool allowed = map_cpuwrite(data, &maddr);
     if (allowed) {
-        assert((size_t)(addr - 0x4020) < cartmem_size);
-        cartmem[addr - 0x4020] = data;
+        assert((size_t)(maddr - 0x4020) < cartmem_size);
+        cartmem[maddr - 0x4020] = data;
     }
 }
 
@@ -230,10 +244,11 @@ u8 Cart_PpuRead(u16 addr)
     CHECK_INIT;
     assert(map_ppuread != NULL);
 #endif
-    bool allowed = map_ppuread(&addr);
+    u32 maddr = addr;
+    bool allowed = map_ppuread(&maddr);
     if (allowed) {
-        assert(addr < chrrom_size);
-        return chrrom[addr];
+        assert(maddr < chrrom_size);
+        return chrrom[maddr];
     }
     return 0;
 }
@@ -244,10 +259,11 @@ void Cart_PpuWrite(u8 data, u16 addr)
     CHECK_INIT;
     assert(map_ppuwrite != NULL);
 #endif
-    bool allowed = map_ppuwrite(&addr);
+    u32 maddr = addr;
+    bool allowed = map_ppuwrite(data, &maddr);
     if (allowed) {
-        assert(addr < chrrom_size);
-        chrrom[addr] = data;
+        assert(maddr < chrrom_size);
+        chrrom[maddr] = data;
     }
 }
 

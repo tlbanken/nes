@@ -10,49 +10,34 @@
 #include <utils.h>
 #include <cart.h>
 
-static size_t prgrom_size;
-static size_t chrrom_size;
+static size_t prgrom_banks;
+static size_t chrrom_banks;
 
-void Map000_Init(u8 prgrom_banks, u8 chrrom_banks)
+void Map000_Init(u8 _prgrom_banks, u8 _chrrom_banks)
 {
-    prgrom_size = prgrom_banks * PRGROM_BANK_SIZE;
-    chrrom_size = chrrom_banks * CHRROM_BANK_SIZE;
+    prgrom_banks = _prgrom_banks;
+    chrrom_banks = _chrrom_banks;
 }
 
-bool Map000_CpuRead(u16 *addr)
+bool Map000_CpuRead(u32 *addr)
 {
-    // PRG-RAM
-    if (*addr >= 0x6000 && *addr <= 0x7FFF) {
-        // no maps
-        return true;
-    }
-
-    // PRG-ROM
-    if (*addr >= 0x8000) {
-        *addr &= ~0x4000;
-        return true;
-    }
-
     // TODO figure out what this is?
     if (*addr < 0x6000) {
-        WARNING("Trying to access unsupported address ($%04X)\n", *addr);
+        WARNING("Trying to access mystery address ($%04X)\n", *addr);
         // no maps
         return true;
     }
 
-    // should not get here
-    assert(0);
-    return false;
+    if (prgrom_banks == 1) {
+        *addr &= ~0x4000;
+    }
+    return true;
+
 }
 
-bool Map000_CpuWrite(u16 *addr)
+bool Map000_CpuWrite(u8 data, u32 *addr)
 {
-    // PRG-RAM
-    if (*addr >= 0x6000 && *addr <= 0x7FFF) {
-        // no maps
-        return true;
-    }
-
+    (void) data;
     // PRG-ROM
     if (*addr >= 0x8000) {
         // no writes
@@ -66,20 +51,20 @@ bool Map000_CpuWrite(u16 *addr)
         return true;
     }
 
-    // should not get here
-    assert(0);
-    return false;
+    // else no maps
+    return true;
 }
 
-bool Map000_PpuRead(u16 *addr)
+bool Map000_PpuRead(u32 *addr)
 {
     (void) addr;
     return true;
 }
 
-bool Map000_PpuWrite(u16 *addr)
+bool Map000_PpuWrite(u8 data, u32 *addr)
 {
+    (void) data;
     (void) addr;
     // only writes if pattern mem is ram
-    return chrrom_size == 0;
+    return chrrom_banks == 0;
 }

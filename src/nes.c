@@ -181,7 +181,7 @@ int main(int argc, char **argv)
     Ppu_Init();
     char title[64] = "NES - ";
     strncat(title, rompath, 64);
-    bool dbg_mode = false;
+    bool dbg_mode = true;
     Vac_Init(title, dbg_mode);
 
     // load up the rom and start the game
