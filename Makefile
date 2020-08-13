@@ -8,6 +8,7 @@ TARGET = nes
 
 SDIR = src
 IDIR = include
+MDIR = src/mappers
 
 CFLAGS = -std=c11
 CFLAGS += -I$(IDIR)
@@ -23,7 +24,7 @@ CFLAGS += -DDEBUG
 
 LIBS = $(shell sdl2-config --libs)
 
-SRC = $(wildcard $(SDIR)/*.c)
+SRC = $(wildcard $(SDIR)/*.c) $(wildcard $(MDIR)/*.c)
 OBJ = ${SRC:.c=.o}
 HDRS = $(wildcard $(IDIR)/*.h)
 
@@ -34,6 +35,9 @@ $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) $(OBJ) $(LIBS) -o $(TARGET)
 
 $(SDIR)/%.o: $(SDIR)/%.c $(HDRS) Makefile
+	$(CC) $(CFLAGS) -c $< $(LIBS) -o $@
+
+$(MDIR)/%.o: $(MDIR)/%.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c $< $(LIBS) -o $@
 
 .PHONY: clean

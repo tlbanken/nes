@@ -4,7 +4,7 @@
  * Travis Banken
  * 2020
  *
- * CPU and PPU memory management. Handles all memory for both the cpu and ppu
+ * CPU and PPU memory management. Abstracts all memory for both the cpu and ppu
  * address space.
  */
 
@@ -49,7 +49,6 @@ void Mem_Init()
 // -----------------------
 // **********************************************************************
 static u8 iram[2*1024] = {0};
-static u8 cartmem[0xBFE0] = {0};
 static u8 controller[2] = {0};
 
 u8 Mem_CpuRead(u16 addr)
@@ -59,10 +58,7 @@ u8 Mem_CpuRead(u16 addr)
 #endif
     // cartridge access (most likely so put this first)
     if (addr >= 0x4020) {
-        addr = Cart_CpuMap(addr);
-        addr -= 0x4020;
-        assert(addr < sizeof(cartmem));
-        return cartmem[addr];
+        return Cart_CpuRead(addr);
     }
 
     // internal ram access
@@ -121,10 +117,7 @@ void Mem_CpuWrite(u8 data, u16 addr)
 #endif
     // cartridge access (most likely so put this first)
     if (addr >= 0x4020) {
-        addr = Cart_CpuMap(addr);
-        addr -= 0x4020;
-        assert(addr < sizeof(cartmem));
-        cartmem[addr] = data;
+        Cart_CpuWrite(data, addr);
         return;
     }
     
@@ -199,7 +192,6 @@ void Mem_CpuWrite(u8 data, u16 addr)
 // |       (256 B)       |
 // -----------------------
 // **********************************************************************
-static u8 ptrnmem[(8*1024)] = {0};
 static u8 vram[(4*1024)] = {0};
 static u8 palmem[256] = {0};
 
@@ -234,9 +226,7 @@ u8 Mem_PpuRead(u16 addr)
 #endif
     // Pattern table access
     if (addr <= 0x1FFF) {
-        addr = Cart_PpuMap(addr);
-        assert(addr < sizeof(ptrnmem));
-        return ptrnmem[addr];
+        return Cart_PpuRead(addr);
     }
 
     // Nametable access
@@ -284,9 +274,7 @@ void Mem_PpuWrite(u8 data, u16 addr)
 #endif
     // Pattern table access
     if (addr <= 0x1FFF) {
-        addr = Cart_PpuMap(addr);
-        assert(addr < sizeof(ptrnmem));
-        ptrnmem[addr] = data;
+        Cart_PpuWrite(data, addr);
         return;
     }
     
@@ -346,29 +334,6 @@ void Mem_Dump()
         return;
     }
     fwrite(iram, 1, sizeof(iram), ofile);
-    fclose(ofile);
-    ofile = NULL;
-
-    // dump pgr rom
-    ofile = fopen("cartmem.dump", "wb");
-    if (ofile == NULL) {
-        perror("fopen");
-        ERROR("Failed to dump PRG-ROM\n");
-        return;
-    }
-    fwrite(cartmem, 1, sizeof(cartmem), ofile);
-    fclose(ofile);
-    ofile = NULL;
-
-
-    // dump ptrnmem
-    ofile = fopen("chr-rom.dump", "wb");
-    if (ofile == NULL) {
-        perror("fopen");
-        ERROR("Failed to dump CHR-ROM\n");
-        return;
-    }
-    fwrite(ptrnmem, 1, sizeof(ptrnmem), ofile);
     fclose(ofile);
     ofile = NULL;
 

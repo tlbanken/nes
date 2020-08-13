@@ -50,6 +50,10 @@ char* op_to_str(u8 opcode);
     fprintf(stderr, "[%s] WARNING: ", __FUNCTION__); \
     fprintf(stderr, fmt, ##__VA_ARGS__);
 
+#define INFO(fmt, ...) \
+    fprintf(stderr, "[%s] INFO: ", __FUNCTION__); \
+    fprintf(stderr, fmt, ##__VA_ARGS__);
+
 #define EXIT(rc) Utils_ExitWithHandler(rc);
 
 

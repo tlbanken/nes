@@ -538,6 +538,7 @@ void Ppu_Reset()
     memset(sprite_shifter_lo, 0, 8);
     memset(sprite_shifter_hi, 0, 8);
     sprites_found = 0;
+    sprite0_loaded = false;
     memset(oambuf, 0xFF, sizeof(oambuf));
     memset(oam, 0xFF, sizeof(oam));
 }

@@ -90,7 +90,7 @@ static void run(const char *title, bool dbg_mode)
             if (kc & KEY_STEP) {
                 cycles = Cpu_Step();
             } else {
-                while (cycles < 1) {
+                while (cycles < 5) {
                     cycles += Cpu_Step();
                 }
             }
@@ -130,14 +130,14 @@ static void run(const char *title, bool dbg_mode)
             strncat(title_fps, fps, 64);
             Vac_SetWindowTitle(title_fps);
             num_frames = 0;
-        } else if (num_frames > 61) {
+        } else if (num_frames > 60) {
             strncpy(title_fps, title, 64);
             strncat(title_fps, " - 60 fps (capped)", 64);
             Vac_SetWindowTitle(title_fps);
             // cap to 60 fps
             while(!Vac_OneSecPassed()) {
                 Vac_Poll();
-                SDL_Delay(20); // Take some load off of cpu (may cause lag)
+                // SDL_Delay(20); // Take some load off of cpu (may cause lag)
             }
             num_frames = 0;
         }
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
     Ppu_Init();
     char title[64] = "NES - ";
     strncat(title, rompath, 64);
-    bool dbg_mode = true;
+    bool dbg_mode = false;
     Vac_Init(title, dbg_mode);
 
     // load up the rom and start the game

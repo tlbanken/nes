@@ -8,9 +8,11 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
 
 #include <cart.h>
 #include <mem.h>
+#include <mappers.h>
 
 #define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
 
@@ -19,28 +21,25 @@
 // iNES as describe from nes dev
 // https://wiki.nesdev.com/w/index.php/INES
 typedef struct ines_header {
-    char str_nes[4]; // should contain "NES"
-    char magic_1A;   // MS-DOS end-of-file
     u8 prgrom_banks;  // Bank Size in 16 KB units
     u8 chrrom_banks;  // Bank Size in 8 KB units
-    struct {
-        u8 mirror_mode: 1;   // 0: horz, 1: vert
-        u8 battery: 1;       // 0: No battey backed rom, 1: yes battery
-        u8 trainer: 1;       // 0: no trainer, 1: yes trainer
-        u8 fourscreen_mir: 1;// 0: no 4 screen mirroring, 1: ignore mirror mode and use 4 screen mirror
-        u8 vs_unisys: 1;
-        u8 playchoice_10: 1; // 8KB of Hint Screen data stored after CHR data
-        u8 nes2: 2;          // if == 2 then flags 8-15 in NES 2.0 format
-    } flags;
-    u8 mapper_num;
-    u8 prgram_banks; // PRG RAM size in 8KB units
+    u8 prgram_banks;  // PRG RAM size in 8KB units
+    bool battery;     // battery-backed ram present
+    bool trainer;     // 512-byte trainer present
+    u8 mapper_num;    // Cartridge Mapper number
+    enum mirror_mode mirror_mode;
 
     // Some more stuff but its not important :/
 } ines_header_t;
 static ines_header_t inesh;
 
-static size_t prgrom_size;
-static size_t chrrom_size;
+// cartridge memory (dynamic memory)
+static u8 *cartmem = NULL;
+static size_t cartmem_size = 0;
+static u8 *chrrom = NULL;
+static size_t chrrom_size = 0;
+// static u8 cartmem[0xBFE0] = {0};
+// static u8 chrrom[(8*1024)] = {0};
 
 static ines_header_t read_ines_header(FILE *file)
 {
@@ -53,67 +52,85 @@ static ines_header_t read_ines_header(FILE *file)
     // fill ines header
     int i = 0;
     ines_header_t header;
-    memcpy(header.str_nes, filebuf, 3);
-    header.str_nes[3] = '\0';
+
+    // skip over first 3 bytes (not important)
     i += 3;
-    header.magic_1A = filebuf[i++];
+
+    // check magic number
+    u8 magic_1A = filebuf[i++];
+    assert(magic_1A == 0x1A);
+
     header.prgrom_banks = filebuf[i++];
     header.chrrom_banks = filebuf[i++];
 
     u8 flags6, flags7;
     flags6 = filebuf[i++];
     flags7 = filebuf[i++];
+    u8 mirror_v;
+    u8 fourscreen_mir;
     // fill in flags
-    header.flags.mirror_mode    = (flags6 >> 0) & 0x1;
-    header.flags.battery        = (flags6 >> 1) & 0x1;
-    header.flags.trainer        = (flags6 >> 2) & 0x1;
-    header.flags.fourscreen_mir = (flags6 >> 3) & 0x1;
-    header.flags.vs_unisys      = (flags7 >> 0) & 0x1;
-    header.flags.playchoice_10  = (flags7 >> 1) & 0x1;
-    header.flags.nes2           = (flags7 >> 2) & 0x3;
-    // fill in mapper num
-    header.mapper_num = (flags6 >> 4) & 0xF;
+    mirror_v           = (flags6 >> 0) & 0x1;
+    header.battery     = (flags6 >> 1) & 0x1;
+    header.trainer     = (flags6 >> 2) & 0x1;
+    fourscreen_mir     = (flags6 >> 3) & 0x1;
+    header.mapper_num  = (flags6 >> 4) & 0xF;
     header.mapper_num |= (flags7 & 0xF0);
+    INFO("Mapper Number %03d\n", header.mapper_num);
+
     // fill in rest of header
     header.prgram_banks = filebuf[i++];
+
+    // set mirror mode
+    // first check if four screen mode on
+    if (fourscreen_mir) {
+        header.mirror_mode = MIR_4SCRN;
+    } else if (mirror_v) {
+        header.mirror_mode = MIR_VERT;
+    } else {
+        header.mirror_mode = MIR_HORZ;
+    }
 
     return header;
 }
 
-// *** Mappers ***
-static u16 cpu_map000(u16 addr)
+// mapper handlers
+static mapper_func_t map_cpuwrite = NULL;
+static mapper_func_t map_cpuread  = NULL;
+static mapper_func_t map_ppuwrite = NULL;
+static mapper_func_t map_ppuread  = NULL;
+static mapper_init_t map_init     = NULL;
+
+static void setup_mapper_handlers(u8 mapper_num)
 {
-    // PRG-RAM
-    if (addr >= 0x6000 && addr <= 0x7FFF) {
-        return addr;
+    switch (mapper_num) {
+    case 0:
+        map_init     = Map000_Init;
+        map_cpuwrite = Map000_CpuWrite;
+        map_cpuread  = Map000_CpuRead;
+        map_ppuwrite = Map000_PpuWrite;
+        map_ppuread  = Map000_PpuRead;
+        break;
+    default:
+        ERROR("Mapper (%u) not supported!\n", mapper_num);
+        EXIT(1);
     }
-
-    // PRG-ROM
-    if (addr >= 0x8000) {
-        return ((addr - 0x8000) % prgrom_size) + 0x8000;
-    }
-
-    // TODO figure out what this is?
-    if (addr < 0x6000) {
-        WARNING("Trying to access unsupported address ($%04X)\n", addr);
-        return addr;
-    }
-
-    // should not get here
-    assert(0);
-    return 0;
 }
 
-static u16 ppu_map000(u16 addr)
-{
-    return addr;
-}
-
-// *** END Mappers ***
 static bool is_init = false;
 void Cart_Init()
 {
     is_init = true;
+}
+
+void Cart_Reset()
+{
+    if (map_init != NULL) {
+        map_init(inesh.prgrom_banks, inesh.chrrom_banks);
+    }
+    else {
+        ERROR("Cartridge Reset Failed: No Roms loaded :/\n");
+        EXIT(1);
+    }
 }
 
 void Cart_Load(const char *path)
@@ -121,6 +138,18 @@ void Cart_Load(const char *path)
 #ifdef DEBUG
     CHECK_INIT;
 #endif
+
+    // reset memory
+    if (cartmem != NULL) {
+        free(cartmem);
+        cartmem = NULL;
+    }
+    if (chrrom != NULL) {
+        free(chrrom);
+        chrrom = NULL;
+    }
+
+    // load new rom
     FILE *romfile = fopen(path, "rb");
     if (romfile == NULL) {
         perror("fopen");
@@ -129,67 +158,97 @@ void Cart_Load(const char *path)
     }
 
     inesh = read_ines_header(romfile);
-    if (inesh.flags.trainer) {
+    if (inesh.trainer) {
         // TODO add trainer support ???
         ERROR("No trainer support :(\n");
         EXIT(1);
     }
 
-    prgrom_size = inesh.prgrom_banks * (16*1024);
+    size_t prgrom_size = inesh.prgrom_banks * PRGROM_BANK_SIZE;
     assert(prgrom_size != 0);
-    chrrom_size = inesh.chrrom_banks * (8*1024);
+    chrrom_size = inesh.chrrom_banks * CHRROM_BANK_SIZE;
+    if (chrrom_size == 0) {
+        // TODO: Figure out CHR-RAM situation
+        WARNING("CHR-ROM Bank size is ZERO! Maybe it uses CHR-RAM??\n");
+    }
     // assert(chrrom_size != 0);
 
-    // write out prg rom
-    u8 prgrom_buf[prgrom_size];
-    fread(prgrom_buf, 1, prgrom_size, romfile);
-    for (u32 i = 0; i < prgrom_size; i++) {
-        Mem_CpuWrite(prgrom_buf[i], i + 0x8000);
+    // initialize memory
+    cartmem_size = prgrom_size + (0x8000 - 0x4020 + 1);
+    cartmem = malloc(cartmem_size);
+    chrrom = malloc(chrrom_size);
+    if (cartmem == NULL || chrrom == NULL) {
+        ERROR("Out of Host Memory!\n");
+        EXIT(1);
     }
 
-    u8 chrrom_buf[chrrom_size];
-    fread(chrrom_buf, 1, chrrom_size, romfile);
-    for (u32 i = 0; i < chrrom_size; i++) {
-        Mem_PpuWrite(chrrom_buf[i], i);
-    }
+    // write out prg rom
+    fread(&cartmem[0x8000 - 0x4020], 1, prgrom_size, romfile);
+
+    // may be zero if cart uses chr-ram
+    fread(&chrrom[0], 1, chrrom_size, romfile);
+
+    // init mapper handlers
+    setup_mapper_handlers(inesh.mapper_num);
+    map_init(inesh.prgrom_banks, inesh.chrrom_banks);
 
     // TODO the rare extensions
-
+    INFO("%s loaded successfully!\n", path);
     fclose(romfile);
 }
 
-u16 Cart_CpuMap(u16 addr)
+u8 Cart_CpuRead(u16 addr)
 {
 #ifdef DEBUG
     CHECK_INIT;
+    assert(map_cpuread != NULL);
 #endif
-    switch (inesh.mapper_num) {
-    case 0:
-        return cpu_map000(addr);
-    default:
-        ERROR("Mapper (%u) not supported!\n", inesh.mapper_num);
-        EXIT(1);
+    bool allowed = map_cpuread(&addr);
+    if (allowed) {
+        assert((size_t)(addr - 0x4020) < cartmem_size);
+        return cartmem[addr - 0x4020];
     }
-    // should not get here
-    assert(0);
     return 0;
 }
 
-u16 Cart_PpuMap(u16 addr)
+void Cart_CpuWrite(u8 data, u16 addr)
 {
 #ifdef DEBUG
     CHECK_INIT;
+    assert(map_cpuwrite != NULL);
 #endif
-    switch (inesh.mapper_num) {
-    case 0:
-        return ppu_map000(addr);
-    default:
-        ERROR("Mapper (%u) not supported!\n", inesh.mapper_num);
-        EXIT(1);
-    } 
-    // should not get here
-    assert(0);
+    bool allowed = map_cpuwrite(&addr);
+    if (allowed) {
+        assert((size_t)(addr - 0x4020) < cartmem_size);
+        cartmem[addr - 0x4020] = data;
+    }
+}
+
+u8 Cart_PpuRead(u16 addr)
+{
+#ifdef DEBUG
+    CHECK_INIT;
+    assert(map_ppuread != NULL);
+#endif
+    bool allowed = map_ppuread(&addr);
+    if (allowed) {
+        assert(addr < chrrom_size);
+        return chrrom[addr];
+    }
     return 0;
+}
+
+void Cart_PpuWrite(u8 data, u16 addr)
+{
+#ifdef DEBUG
+    CHECK_INIT;
+    assert(map_ppuwrite != NULL);
+#endif
+    bool allowed = map_ppuwrite(&addr);
+    if (allowed) {
+        assert(addr < chrrom_size);
+        chrrom[addr] = data;
+    }
 }
 
 inline enum mirror_mode Cart_GetMirrorMode()
@@ -197,19 +256,7 @@ inline enum mirror_mode Cart_GetMirrorMode()
 #ifdef DEBUG
     CHECK_INIT;
 #endif
-    // first check if four screen mode on
-    if (inesh.flags.fourscreen_mir) {
-        return MIR_4SCRN;
-    }
-
-    if (inesh.flags.mirror_mode) {
-        return MIR_VERT;
-    } else {
-        return MIR_HORZ;
-    }
-    // should not get here
-    assert(0);
-    return 0;
+    return inesh.mirror_mode;
 }
 
 void Cart_Dump()
@@ -229,20 +276,36 @@ void Cart_Dump()
     fprintf(ofile, "---------------------------------------\n");
     fprintf(ofile, "iNES Header Dump\n");
     fprintf(ofile, "---------------------------------------\n");
-    fprintf(ofile, "NES STR: %s\n", inesh.str_nes);
-    fprintf(ofile, "Magic 1A: %02X\n", inesh.magic_1A);
+    fprintf(ofile, "Mapper Num: %u\n", inesh.mapper_num);
     fprintf(ofile, "Num PRG-ROM Banks: %u\n", inesh.prgrom_banks);
     fprintf(ofile, "Num CHR-ROM Banks: %u\n", inesh.chrrom_banks);
+    fprintf(ofile, "Num PRG-RAM Banks: %u\n", inesh.prgram_banks);
     fprintf(ofile, "*** Flags ***\n");
-    fprintf(ofile, "    Mirror Type: %u\n", inesh.flags.mirror_mode);
-    fprintf(ofile, "    Battery: %u\n", inesh.flags.battery);
-    fprintf(ofile, "    Trainer: %u\n", inesh.flags.trainer);
-    fprintf(ofile, "    4 Screen Mirror: %u\n", inesh.flags.fourscreen_mir);
-    fprintf(ofile, "    VS Unisystem: %u\n", inesh.flags.vs_unisys);
-    fprintf(ofile, "    PlayChoice-10: %u\n", inesh.flags.playchoice_10);
-    fprintf(ofile, "    NES 2.0: %u\n", inesh.flags.nes2);
-    fprintf(ofile, "Mapper Num: %u\n", inesh.mapper_num);
-    fprintf(ofile, "Num Ram Banks: %u\n", inesh.prgram_banks);
+    fprintf(ofile, "    Mirror Type: %u\n", inesh.mirror_mode == MIR_VERT ? 1 : 0);
+    fprintf(ofile, "    4 Screen Mirror: %u\n", inesh.mirror_mode == MIR_4SCRN ? 1 : 0);
+    fprintf(ofile, "    Battery: %u\n", inesh.battery ? 1 : 0);
     fprintf(ofile, "---------------------------------------\n");
     fclose(ofile);
+
+    // dump cartridge memory
+    ofile = fopen("cartmem.dump", "wb");
+    if (ofile == NULL) {
+        perror("fopen");
+        ERROR("Failed to dump PRG-ROM\n");
+        return;
+    }
+    fwrite(cartmem, 1, cartmem_size, ofile);
+    fclose(ofile);
+    ofile = NULL;
+
+    // dump chrrom
+    ofile = fopen("chr-rom.dump", "wb");
+    if (ofile == NULL) {
+        perror("fopen");
+        ERROR("Failed to dump CHR-ROM\n");
+        return;
+    }
+    fwrite(chrrom, 1, chrrom_size, ofile);
+    fclose(ofile);
+    ofile = NULL;
 }
