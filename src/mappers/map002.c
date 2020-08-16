@@ -4,10 +4,11 @@
  * Travis Banken
  * 2020
  *
- * Mapper 002 Boards: UNROM, UOROM
+ * Mapper 2 Boards: UNROM, UOROM
  */
 
 #include <utils.h>
+#include <cart.h>
 
 static u8 prgrom_banks;
 static u8 chrrom_banks;
@@ -26,14 +27,14 @@ bool Map002_CpuRead(u32 *addr)
 {
     // first 16 KB in PRGROM
     if (*addr >= 0x8000 && *addr <= 0xBFFF) {
-        *addr = *addr + (prgrom_bank_select << 14);
+        *addr = *addr + (prgrom_bank_select * 0x4000);
         return true;
     }
 
     // last 16 KB in PRGROM
     if (*addr >= 0xC000) {
         // select the last bank
-        *addr = *addr + ((prgrom_banks - 2) << 14);
+        *addr = (*addr - 0x4000) + ((prgrom_banks - 1) * 0x4000);
         return true;
     }
 
@@ -63,5 +64,10 @@ bool Map002_PpuWrite(u8 data, u32 *addr)
     (void) addr;
     (void) data;
     return chrrom_banks == 0;
+}
+
+enum mirror_mode Map002_GetMirrorMode()
+{
+    return MIR_DEFAULT;
 }
 

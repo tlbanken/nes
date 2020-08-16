@@ -13,9 +13,12 @@
 #include <utils.h>
 
 enum mirror_mode {
-	MIR_HORZ  = 0,
-	MIR_VERT  = 1,
-	MIR_4SCRN = 2
+	MIR_HORZ,
+	MIR_VERT,
+	MIR_4SCRN,
+	MIR_1LOWER,
+	MIR_1UPPER,
+	MIR_DEFAULT,
 };
 
 #define PRGROM_BANK_SIZE (16*1024)

@@ -17,6 +17,7 @@
 #define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
 
 #define INES_HEADER_SIZE 16
+#define CARTMEM_OFFSET 0x4020
 
 // iNES as describe from nes dev
 // https://wiki.nesdev.com/w/index.php/INES
@@ -98,7 +99,8 @@ static mapper_wfunc_t map_cpuwrite = NULL;
 static mapper_rfunc_t map_cpuread  = NULL;
 static mapper_wfunc_t map_ppuwrite = NULL;
 static mapper_rfunc_t map_ppuread  = NULL;
-static mapper_init_t map_init     = NULL;
+static mapper_mirfunc_t map_getmirrormode = NULL;
+static mapper_init_t map_init      = NULL;
 
 static void setup_mapper_handlers(u8 mapper_num)
 {
@@ -109,6 +111,15 @@ static void setup_mapper_handlers(u8 mapper_num)
         map_cpuread  = Map000_CpuRead;
         map_ppuwrite = Map000_PpuWrite;
         map_ppuread  = Map000_PpuRead;
+        map_getmirrormode = Map000_GetMirrorMode;
+        break;
+    case 1:
+        map_init     = Map001_Init;
+        map_cpuwrite = Map001_CpuWrite;
+        map_cpuread  = Map001_CpuRead;
+        map_ppuwrite = Map001_PpuWrite;
+        map_ppuread  = Map001_PpuRead;
+        map_getmirrormode = Map001_GetMirrorMode;
         break;
     case 2:
         map_init     = Map002_Init;
@@ -116,6 +127,7 @@ static void setup_mapper_handlers(u8 mapper_num)
         map_cpuread  = Map002_CpuRead;
         map_ppuwrite = Map002_PpuWrite;
         map_ppuread  = Map002_PpuRead;
+        map_getmirrormode = Map002_GetMirrorMode;
         break;
     default:
         ERROR("Mapper (%u) not supported!\n", mapper_num);
@@ -170,6 +182,10 @@ void Cart_Load(const char *path)
         ERROR("No trainer support :(\n");
         EXIT(1);
     }
+    if (inesh.battery) {
+        // TODO add save support
+        WARNING("No support for battery-backed RAM! Your game will not be saved!\n");
+    }
 
     size_t prgrom_size = inesh.prgrom_banks * PRGROM_BANK_SIZE;
     assert(prgrom_size != 0);
@@ -180,10 +196,9 @@ void Cart_Load(const char *path)
         // for now, assume max size??
         chrrom_size = (8*1024);
     }
-    // assert(chrrom_size != 0);
 
     // initialize memory
-    cartmem_size = prgrom_size + (0x8000 - 0x4020);
+    cartmem_size = prgrom_size + (0x8000 - CARTMEM_OFFSET);
     cartmem = malloc(cartmem_size);
     chrrom = malloc(chrrom_size);
     if (cartmem == NULL || chrrom == NULL) {
@@ -192,7 +207,7 @@ void Cart_Load(const char *path)
     }
 
     // write out prg rom
-    fread(&cartmem[0x8000 - 0x4020], 1, prgrom_size, romfile);
+    fread(&cartmem[0x8000 - CARTMEM_OFFSET], 1, prgrom_size, romfile);
 
     // may be zero if cart uses chr-ram
     fread(&chrrom[0], 1, chrrom_size, romfile);
@@ -218,8 +233,8 @@ u8 Cart_CpuRead(u16 addr)
     u32 maddr = addr;
     bool allowed = map_cpuread(&maddr);
     if (allowed) {
-        assert((size_t)(maddr - 0x4020) < cartmem_size);
-        return cartmem[maddr - 0x4020];
+        assert((size_t)(maddr - CARTMEM_OFFSET) < cartmem_size);
+        return cartmem[maddr - CARTMEM_OFFSET];
     }
     return 0;
 }
@@ -233,8 +248,8 @@ void Cart_CpuWrite(u8 data, u16 addr)
     u32 maddr = addr;
     bool allowed = map_cpuwrite(data, &maddr);
     if (allowed) {
-        assert((size_t)(maddr - 0x4020) < cartmem_size);
-        cartmem[maddr - 0x4020] = data;
+        assert((size_t)(maddr - CARTMEM_OFFSET) < cartmem_size);
+        cartmem[maddr - CARTMEM_OFFSET] = data;
     }
 }
 
@@ -272,7 +287,11 @@ inline enum mirror_mode Cart_GetMirrorMode()
 #ifdef DEBUG
     CHECK_INIT;
 #endif
-    return inesh.mirror_mode;
+    enum mirror_mode mm = map_getmirrormode();
+    if (mm == MIR_DEFAULT) {
+        return inesh.mirror_mode;
+    }
+    return mm;
 }
 
 void Cart_Dump()

@@ -68,3 +68,8 @@ bool Map000_PpuWrite(u8 data, u32 *addr)
     // only writes if pattern mem is ram
     return chrrom_banks == 0;
 }
+
+enum mirror_mode Map000_GetMirrorMode()
+{
+    return MIR_DEFAULT;
+}

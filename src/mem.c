@@ -206,13 +206,36 @@ static u16 mirror(u16 addr)
     enum mirror_mode mirror_mode = Cart_GetMirrorMode();
     switch (mirror_mode) {
     case MIR_HORZ:
+        // $2000 and $2400 are mirrored
+        // $2800 and $2C00 are mirrored
         addr &= ~0x0400;
         break;
     case MIR_VERT:
+        // $2000 and $2800 are mirrored
+        // $2400 and $2C00 are mirrored
         addr &= ~0x0800;
         break;
     case MIR_4SCRN:
-        ERROR("No support for 4 screen mirror mode!\n");
+        // no change to addr (no mirroring)
+        break;
+    case MIR_1LOWER:
+        WARNING("Using experimental One Screen Lower Mirroring!\n");
+        EXIT(1);
+        // everything is mirrored to $2000
+        addr &= ~0x0C00;
+        break;
+    case MIR_1UPPER:
+        WARNING("Using experimental One Screen Upper Mirroring!\n");
+        EXIT(1);
+        // everything is mirrored to $2400
+        addr &= ~0x0C00;
+        break;
+    // case MIR_1LOWER:
+    //     ERROR("No support for (1 lower) mirror mode!\n");
+    //     EXIT(1);
+    //     break;
+    case MIR_DEFAULT:
+        ERROR("Invalid mirror mode (default)\n");
         EXIT(1);
         break;
     }
