@@ -22,7 +22,7 @@ CFLAGS += -g
 # CFLAGS += -pg # for profiling
 CFLAGS += -DDEBUG
 
-LIBS = $(shell sdl2-config --libs)
+LIBS = $(shell sdl2-config --libs) -lm
 
 SRC = $(wildcard $(SDIR)/*.c) $(wildcard $(MDIR)/*.c)
 OBJ = ${SRC:.c=.o}

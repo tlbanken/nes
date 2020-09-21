@@ -28,6 +28,11 @@ static nes_color_t vbuf[RES_X * RES_Y];
 static nes_color_t pt_vbuf[2][128*128];
 static nes_color_t nt_vbuf[2][RES_X*RES_Y];
 
+// audio
+static SDL_AudioDeviceID audio_dev;
+static u8 dev_silence = 0;
+static void audio_callback(void *usedata, u8 *stream, int len);
+
 static int scale(int val)
 {
     return val * pxscale;
@@ -156,11 +161,32 @@ void Vac_Init(const char *title, bool debug_display)
 
     int rc;
     // init sdl
-    rc = SDL_Init(SDL_INIT_VIDEO);
+    rc = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
     if (rc < 0) {
         ERROR("%s\n", SDL_GetError());
         EXIT(1);
     }
+
+    // init audio
+    SDL_AudioSpec want, have;
+    memset(&want, 0, sizeof(want));
+    want.freq = 44100;
+    want.format = AUDIO_F32;
+    want.channels = 1;
+    want.samples = 512; // TODO: find best val (must be power of 2)
+    want.callback = audio_callback;
+    audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+    if (audio_dev == 0) {
+        ERROR("Failed to open audio: %s\n", SDL_GetError());
+        EXIT(1);
+    }
+    if (have.format != want.format) {
+        WARNING("FLOAT32 audio format not supported!\n");
+    }
+    if (have.samples != want.samples) {
+        WARNING("Got %d sample block, wanted %d sample block\n", have.samples, want.samples);
+    }
+    dev_silence = have.silence;
 
     int wh = scale(RES_Y);
     int ww = scale(RES_X);
@@ -182,6 +208,8 @@ void Vac_Init(const char *title, bool debug_display)
         ERROR("%s\n", SDL_GetError());
         EXIT(1);
     }
+
+    SDL_PauseAudioDevice(audio_dev, 0);
 }
 
 void Vac_Free()
@@ -203,15 +231,6 @@ u16 Vac_Poll()
             break;
         case SDL_KEYDOWN:
             keycode = e.key.keysym.sym;
-
-            // IDK why but for somereason nes doesn't register a held-down
-            // key until it sees a change, so force that change
-            // if (!(keystate & 0xFF)) {
-            //     keystate = set_key(keycode, keystate);
-            // }
-            // else {
-            //     keystate &= 0xFF00;
-            // }
             keystate = set_key(keycode, keystate);
             break;
         case SDL_KEYUP:
@@ -274,26 +293,6 @@ void Vac_Refresh()
                 }
             }
         }
-
-        // draw nametable
-        // for (int table_side = 0; table_side < 2; table_side++) {
-        //     for (int y = 0; y < 240; y++) {
-        //         for (int x = 0; x < 256; x++) {
-        //             // set color
-        //             nes_color_t color = nt_vbuf[table_side][y*256 + x];
-        //             int rc = SDL_SetRenderDrawColor(renderer, color.red, color.green, color.blue, SDL_ALPHA_OPAQUE);
-        //             assert(rc == 0);
-
-        //             SDL_Rect rect;
-        //             rect.x = scale_dbg(x + 1) + scale(RES_X) + (scale_dbg(256) * table_side
-        //                 + scale_dbg(1) * table_side);
-        //             rect.y = scale_dbg(y + scale_dbg(64));
-        //             rect.w = scale_dbg(1);
-        //             rect.h = scale_dbg(1);
-        //             SDL_RenderFillRect(renderer, &rect);
-        //         }
-        //     }
-        // }
     }
 
     reset_draw_color();
@@ -342,6 +341,11 @@ unsigned int Vac_MsPassedFrom(unsigned int from)
     return cur_ms - from;
 }
 
+unsigned int Vac_Now()
+{
+    return SDL_GetTicks();
+}
+
 bool Vac_OneSecPassed()
 {
     static unsigned int last_ms = 0;
@@ -354,7 +358,39 @@ bool Vac_OneSecPassed()
     }
 }
 
+void Vac_Delay(unsigned int ms)
+{
+    SDL_Delay(ms);
+}
+
 void Vac_SetWindowTitle(const char *title)
 {
     SDL_SetWindowTitle(window, title);
 }
+
+// *********************************************************
+// *** AUDIO ***
+// *********************************************************
+static audio_callback_t apu_audio_callback = NULL; 
+
+static void audio_callback(void *userdata, u8 *stream, int len)
+{
+    (void) userdata;
+    // make sure a callback handler is set
+    if (apu_audio_callback == NULL) {
+        memset(stream, dev_silence, len);
+    } else {
+        apu_audio_callback(stream, len);
+    }
+}
+
+void Vac_SetAudioCallback(audio_callback_t a)
+{
+    apu_audio_callback = a;
+}
+
+u8 Vac_GetSilence()
+{
+    return dev_silence;
+}
+

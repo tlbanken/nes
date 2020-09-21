@@ -14,6 +14,7 @@
 #include <cart.h>
 #include <ppu.h>
 #include <vac.h>
+#include <apu.h>
 
 #define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
 
@@ -90,8 +91,8 @@ u8 Mem_CpuRead(u16 addr)
             controller[1] <<= 1;
             return res; // upper bits same as addr
         default:
-            WARNING("APU/IO reg not available ($%04X)\n", addr);
-            break;
+            // let the apu handle the address
+            return Apu_Read(addr);
         }
         return 0;
     }
@@ -152,7 +153,8 @@ void Mem_CpuWrite(u8 data, u16 addr)
             }
             break;
         default:
-            WARNING("APU/IO reg not available ($%04X)\n", addr);
+            // let the apu handle the rest of the addresses
+            Apu_Write(data, addr);
             break;
         }
         // EXIT(1);

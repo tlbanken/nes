@@ -36,6 +36,8 @@ enum nes_keycode {
     KEY_RESET      = (1 << 13),
 };
 
+typedef void (*audio_callback_t)(u8*, int);
+
 void Vac_Init(const char *title, bool debug_display);
 void Vac_Free();
 void Vac_Refresh();
@@ -45,8 +47,10 @@ void Vac_SetPxPt(int table_side, u16 x, u16 y, nes_color_t color);
 void Vac_SetPxNt(int table_side, u16 x, u16 y, nes_color_t color);
 void Vac_ClearScreen();
 unsigned int Vac_MsPassedFrom(unsigned int from);
+unsigned int Vac_Now();
 bool Vac_OneSecPassed();
+void Vac_Delay(unsigned int ms);
 void Vac_SetWindowTitle(const char *title);
-
+void Vac_SetAudioCallback(audio_callback_t a);
 
 #endif

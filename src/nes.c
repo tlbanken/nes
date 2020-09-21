@@ -17,6 +17,7 @@
 #include <cart.h>
 #include <cpu.h>
 #include <ppu.h>
+#include <apu.h>
 #include <vac.h>
 
 static void sighandler(int sig)
@@ -46,13 +47,17 @@ static void exit_handler(int rc)
 
 static void run(const char *title, bool dbg_mode)
 {
-    char title_fps[64];
-    char fps[16];
+    char title_fps[128];
+    char fps[64];
+
+    unsigned int last_frame_ms = Vac_Now();
 
     // int limit = 9000;
     // int rounds = 0;
     u32 cycles = 0;
     u32 num_frames = 0;
+    u32 cpf = 0;
+    u32 mcpf = 0;
     // bool paused = true; // NOTE: TESTING
     bool paused = false;
     // bool frame_mode = true; // NOTE: TESTING
@@ -90,12 +95,13 @@ static void run(const char *title, bool dbg_mode)
             if (kc & KEY_STEP) {
                 cycles = Cpu_Step();
             } else {
-                while (cycles < 5) {
+                while (cycles < 20) {
                     cycles += Cpu_Step();
                 }
             }
             frame_finished = Ppu_Step(3 * cycles);
-            // TODO: APU
+            Apu_Step(cycles / 2);
+            cpf += cycles;
             cycles = 0;
         }
 
@@ -118,7 +124,15 @@ static void run(const char *title, bool dbg_mode)
             Vac_Refresh();
             Vac_ClearScreen();
 
+            // one frame should take about 17 ms
+            unsigned int passed;
+            if ((passed = Vac_MsPassedFrom(last_frame_ms)) < 16) {
+                Vac_Delay(16 - passed);
+            }
+            last_frame_ms = Vac_Now();
             num_frames++;
+            mcpf = cpf > mcpf ? cpf : mcpf;
+            cpf = 0;
         }
 
         // TODO: Only during debug mode!
@@ -126,21 +140,23 @@ static void run(const char *title, bool dbg_mode)
         if (Vac_OneSecPassed()) {
             // display frame rate
             strncpy(title_fps, title, 64);
-            sprintf(fps, " - %d fps", num_frames);
+            sprintf(fps, " | %d fps | CPU: %0.3lf MHz", num_frames, 
+                (double) (mcpf * num_frames) / 1000000.0);
             strncat(title_fps, fps, 64);
             Vac_SetWindowTitle(title_fps);
             num_frames = 0;
-        } else if (num_frames > 60) {
-            strncpy(title_fps, title, 64);
-            strncat(title_fps, " - 60 fps (capped)", 64);
-            Vac_SetWindowTitle(title_fps);
-            // cap to 60 fps
-            while(!Vac_OneSecPassed()) {
-                Vac_Poll();
-                // SDL_Delay(20); // Take some load off of cpu (may cause lag)
-            }
-            num_frames = 0;
-        }
+        } 
+        // else if (num_frames > 60) {
+        //     strncpy(title_fps, title, 64);
+        //     strncat(title_fps, " - 60 fps (capped)", 64);
+        //     Vac_SetWindowTitle(title_fps);
+        //     // cap to 60 fps
+        //     // while(!Vac_OneSecPassed()) {
+        //     //     Vac_Poll();
+        //     //     // SDL_Delay(20); // Take some load off of cpu (may cause lag)
+        //     // }
+        //     num_frames = 0;
+        // }
     }
 }
 
@@ -179,18 +195,20 @@ int main(int argc, char **argv)
     Cart_Init();
     Cpu_Init();
     Ppu_Init();
+    Apu_Init();
     char title[64] = "NES - ";
     strncat(title, rompath, 64);
-    bool dbg_mode = true;
+    bool dbg_mode = false;
     Vac_Init(title, dbg_mode);
 
-    // load up the rom and start the game
-    Cart_Load(rompath);
-
-    // run only returns on RESET
+    // run only returns on NES RESET
     while (1) {
+        // NOTE: cartridge must be loaded before any other reset
+        Cart_Load(rompath);
+
         Cpu_Reset();
         Ppu_Reset();
+        Apu_Reset();
         run(title, dbg_mode);
         Vac_ClearScreen();
     }
