@@ -52,5 +52,6 @@ bool Vac_OneSecPassed();
 void Vac_Delay(unsigned int ms);
 void Vac_SetWindowTitle(const char *title);
 void Vac_SetAudioCallback(audio_callback_t a);
+u8 Vac_GetSilence();
 
 #endif

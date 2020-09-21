@@ -7,10 +7,12 @@
  * Audio Processing Unit for the NES.
  */
 
-#include <utils.h>
-#include <apu.h>
 #include <math.h>
 #include <string.h>
+
+#include <utils.h>
+#include <apu.h>
+#include <vac.h>
 
 #define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
 
@@ -61,14 +63,23 @@ typedef struct pulse_channel {
 } pulse_channel_t;
 static pulse_channel_t pulse[2] = {0};
 
+typedef struct triangle_channel {
+    bool enabled;
+    bool halt_counter;
+    u8 lin_counter_load;
+    u16 timer;
+    u16 counter;
+    int t_phase;
+} triangle_channel_t;
+static triangle_channel_t triangle;
+
 static bool is_init = false;
 
 // the higher the number, the better the approximation to square wave
 #define SQR_ITER 50
-// #define MASTER_VOLUME 0.2f
 #define MASTER_VOLUME 1.0f
 #define CPU_CLOCK_RATE 1789773
-#define PI 3.14159265
+#define PI 3.14159265f
 
 // ring buffer
 #define RING_BUFFER_SIZE 4096 // Keep in mind the num samples def in vac.c
@@ -83,22 +94,22 @@ static ring_buffer_t rbuf;
 // https://www.youtube.com/watch?v=1xlCVBIF_ig
 static float fast_sin(float x)
 {
-    float t = x * (1.0 / (2.0 * PI));
+    float t = x * (1.0f / (2.0f * PI));
     t = t - (int) t;
-    if (t < 0.5) {
-        return -16 * (t*t) + 8*t;
+    if (t < 0.5f) {
+        return -16.0f * (t*t) + 8.0f*t;
     } else {
-        return 16.0 * (t*t) - 24.0*t + 8;
+        return 16.0f * (t*t) - 24.0f*t + 8.0f;
     }
 }
 
 static float gen_pulse_sample(int channel)
 {
     if (pulse[channel].timer < 8 || !pulse[channel].enabled) {
-        return 0.0;
+        return 0.0f;
     }
 
-    float tau = (float) pulse[channel].t_phase++ / 44100.0;
+    float tau = (float) pulse[channel].t_phase++ / 44100.0f;
 
     // freq calc based on https://wiki.nesdev.com/w/index.php/APU
     float note = CPU_CLOCK_RATE / (16 * (pulse[channel].timer));
@@ -109,19 +120,24 @@ static float gen_pulse_sample(int channel)
     float res1 = 0.0f;
     float res2 = 0.0f;
     for (int i = 1; i <= SQR_ITER; i++) {
-        res1 += (fast_sin(note * 2.0 * PI * (float)i * tau) / (float)i);
-        res2 += (fast_sin((note * tau - duty) * 2.0 * PI * (float)i) / (float)i);
+        res1 += (fast_sin(note * 2.0f * PI * (float)i * tau) / (float)i);
+        res2 += (fast_sin((note * tau - duty) * 2.0f * PI * (float)i) / (float)i);
     }
 
     float res = res1 - res2;
     // TESTING: sin wave
     // res = sin(note * tau * 2.0 * PI);
     // printf("Note %f, res %f\n", note, res);
-    float volume = 1.0;
+    float volume = 1.0f;
     if (pulse[channel].const_vol) {
-        volume = (float) pulse[channel].volume / 15.0;
+        volume = (float) pulse[channel].volume / 15.0f;
     }
     return volume * MASTER_VOLUME * res;
+}
+
+static float gen_triangle_sample()
+{
+    return 0.0f;
 }
 
 static void audio_callback(u8 *stream, int len)
@@ -133,7 +149,7 @@ static void audio_callback(u8 *stream, int len)
     // keep read cursor 1 before write cursor
     ready--;
 
-    static int t = 0;
+    // static int t = 0;
 
     // printf("Len: %d | Ready: %d, R: %d, W: %d\n", len / 4, ready, rbuf.rcursor, rbuf.wcursor);
     if (ready == 0 || (len / 4) > ready) {
@@ -168,9 +184,14 @@ void Apu_Reset()
     CHECK_INIT
 #endif
     apuflags = 0;
-    // TODO reset channels
+
+    // reset channels
+    memset(&pulse[0], 0, sizeof(pulse_channel_t));
+    memset(&pulse[1], 0, sizeof(pulse_channel_t));
+    memset(&triangle, 0, sizeof(triangle_channel_t));
+
     // reset ring buffer
-    memset(rbuf.samples, 0, RING_BUFFER_SIZE);
+    memset(rbuf.samples, 0, RING_BUFFER_SIZE * sizeof(float));
     rbuf.wcursor = 1;
     rbuf.rcursor = 0;
 }
@@ -201,8 +222,8 @@ void Apu_Step(int cycle_budget)
             // make sure we have enough buffer space to avoid starvation
             while (dist++ < ((RING_BUFFER_SIZE / 2) - 1)) {
                 // gen sample
-                static int t = 0;
-                float tau = (float) t++ / 44100.0; // will this work?
+                // static int t = 0;
+                // float tau = (float) t++ / 44100.0; // will this work?
                 float sample = 0;
                 // sample += fast_sin(240.0 * tau * 2.0 * PI);
                 sample += gen_pulse_sample(0);
