@@ -66,7 +66,7 @@ static void run(const char *title, bool dbg_mode)
     u8 pal_id = 1;
     while (true) {
         // poll keyboard
-        u16 kc = Vac_Poll();
+        u32 kc = Vac_Poll();
         if (kc & KEY_PAUSE) {
             paused = true;
         } else if (kc & KEY_CONTINUE) {
@@ -95,12 +95,12 @@ static void run(const char *title, bool dbg_mode)
             if (kc & KEY_STEP) {
                 cycles = Cpu_Step();
             } else {
-                while (cycles < 20) {
+                while (cycles < 10) {
                     cycles += Cpu_Step();
                 }
             }
             frame_finished = Ppu_Step(3 * cycles);
-            Apu_Step(cycles / 2);
+            Apu_Step(cycles / 2, kc);
             cpf += cycles;
             cycles = 0;
         }

@@ -52,7 +52,7 @@ static void reset_draw_color()
     }
 }
 
-static u16 set_key(SDL_Keycode keycode, u16 keystate)
+static u32 set_key(SDL_Keycode keycode, u32 keystate)
 {
     switch (keycode) {
     // Game pad keys
@@ -99,11 +99,27 @@ static u16 set_key(SDL_Keycode keycode, u16 keystate)
     case SDLK_ESCAPE:
         keystate |= KEY_RESET;
         break;
+    // Mute Channels
+    case SDLK_1:
+        keystate |= KEY_MUTE_1;
+        break;
+    case SDLK_2:
+        keystate |= KEY_MUTE_2;
+        break;
+    case SDLK_3:
+        keystate |= KEY_MUTE_3;
+        break;
+    case SDLK_4:
+        keystate |= KEY_MUTE_4;
+        break;
+    case SDLK_5:
+        keystate |= KEY_MUTE_5;
+        break;
     }
     return keystate;
 }
 
-static u16 unset_key(SDL_Keycode keycode, u16 keystate)
+static u32 unset_key(SDL_Keycode keycode, u32 keystate)
 {
     switch (keycode) {
     // Game pad keys
@@ -149,6 +165,22 @@ static u16 unset_key(SDL_Keycode keycode, u16 keystate)
         break;
     case SDLK_ESCAPE:
         keystate &= ~KEY_RESET;
+        break;
+    // mute channels
+    case SDLK_1:
+        keystate &= ~KEY_MUTE_1;
+        break;
+    case SDLK_2:
+        keystate &= ~KEY_MUTE_2;
+        break;
+    case SDLK_3:
+        keystate &= ~KEY_MUTE_3;
+        break;
+    case SDLK_4:
+        keystate &= ~KEY_MUTE_4;
+        break;
+    case SDLK_5:
+        keystate &= ~KEY_MUTE_5;
         break;
     }
     return keystate;
@@ -219,9 +251,9 @@ void Vac_Free()
     SDL_Quit();
 }
 
-u16 Vac_Poll()
+u32 Vac_Poll()
 {
-    static u16 keystate = 0;
+    static u32 keystate = 0;
     SDL_Event e;
     SDL_Keycode keycode;
     if (SDL_PollEvent(&e)) {

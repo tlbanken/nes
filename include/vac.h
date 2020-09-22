@@ -19,6 +19,7 @@ typedef struct nes_color {
 } nes_color_t;
 
 enum nes_keycode {
+    // Controller inputs
     KEY_RIGHT      = (1 << 0),
     KEY_LEFT       = (1 << 1),
     KEY_DOWN       = (1 << 2),
@@ -34,6 +35,12 @@ enum nes_keycode {
     KEY_FRAME_MODE = (1 << 11),
     KEY_PAL_CHANGE = (1 << 12),
     KEY_RESET      = (1 << 13),
+    // Sound Control
+    KEY_MUTE_1     = (1 << 14),
+    KEY_MUTE_2     = (1 << 15),
+    KEY_MUTE_3     = (1 << 16),
+    KEY_MUTE_4     = (1 << 17),
+    KEY_MUTE_5     = (1 << 18),
 };
 
 typedef void (*audio_callback_t)(u8*, int);
@@ -41,7 +48,7 @@ typedef void (*audio_callback_t)(u8*, int);
 void Vac_Init(const char *title, bool debug_display);
 void Vac_Free();
 void Vac_Refresh();
-u16 Vac_Poll();
+u32 Vac_Poll();
 void Vac_SetPx(int x, int y, nes_color_t color);
 void Vac_SetPxPt(int table_side, u16 x, u16 y, nes_color_t color);
 void Vac_SetPxNt(int table_side, u16 x, u16 y, nes_color_t color);

@@ -49,6 +49,7 @@ typedef struct pulse_channel {
     bool enabled;
     bool halt_counter;
     bool const_vol;
+    bool mute;
     float duty;
     u16 timer;
     u16 counter;
@@ -66,7 +67,10 @@ static pulse_channel_t pulse[2] = {0};
 typedef struct triangle_channel {
     bool enabled;
     bool halt_counter;
-    u8 lin_counter_load;
+    bool reload;
+    bool mute;
+    u8 lin_counter;
+    u8 lin_counter_reload;
     u16 timer;
     u16 counter;
     int t_phase;
@@ -76,7 +80,8 @@ static triangle_channel_t triangle;
 static bool is_init = false;
 
 // the higher the number, the better the approximation to square wave
-#define SQR_ITER 50
+#define SQR_ITER 20
+#define TRI_ITER 20
 #define MASTER_VOLUME 1.0f
 #define CPU_CLOCK_RATE 1789773
 #define PI 3.14159265f
@@ -105,7 +110,7 @@ static float fast_sin(float x)
 
 static float gen_pulse_sample(int channel)
 {
-    if (pulse[channel].timer < 8 || !pulse[channel].enabled) {
+    if (pulse[channel].timer < 8 || !pulse[channel].enabled || pulse[channel].mute) {
         return 0.0f;
     }
 
@@ -137,7 +142,24 @@ static float gen_pulse_sample(int channel)
 
 static float gen_triangle_sample()
 {
-    return 0.0f;
+    if (!triangle.enabled || triangle.mute) {
+        return 0.0f;
+    }
+
+    float note = CPU_CLOCK_RATE / (32.0f * ((float) triangle.timer + 1.0f));
+    // static int t = 0;
+    float tau = (float) triangle.t_phase++ / 44100.0f;
+
+    float res = 0.0f;
+    for (int i = 0; i < TRI_ITER; i++) {
+        int sign = i % 2 ? -1 : 1;
+        int n = (i << 1) + 1;
+        res += (float) sign 
+            * (1.0f / (float) (n * n))
+            * fast_sin(2.0f * PI * note * (float) n * tau);
+    }
+    res *= (8.0f / (PI * PI));
+    return MASTER_VOLUME * res;
 }
 
 static void audio_callback(u8 *stream, int len)
@@ -196,11 +218,29 @@ void Apu_Reset()
     rbuf.rcursor = 0;
 }
 
-void Apu_Step(int cycle_budget)
+void Apu_Step(int cycle_budget, u32 keystate)
 {
 #ifdef DEBUG
     CHECK_INIT
 #endif
+    // debug mute channels
+    static unsigned int last_ms = 0;
+    unsigned int passed = 0;
+    if ((passed = Vac_MsPassedFrom(last_ms)) >= 200) {
+        if (keystate & KEY_MUTE_1) {
+            pulse[0].mute = !pulse[0].mute;
+            last_ms = Vac_Now();
+        }
+        if (keystate & KEY_MUTE_2) {
+            pulse[1].mute = !pulse[1].mute;
+            last_ms = Vac_Now();
+        }
+        if (keystate & KEY_MUTE_3) {
+            triangle.mute = !triangle.mute;
+            last_ms = Vac_Now();
+        }
+    }
+
     // The cpu clocks at about 1.789 Mhz (cycles per sec)
     // The sample rate is 44.1 Khz (samples per sec)
     // Thus we need 1.789 / .0441 = 40.5 (cycles per sample)
@@ -228,6 +268,7 @@ void Apu_Step(int cycle_budget)
                 // sample += fast_sin(240.0 * tau * 2.0 * PI);
                 sample += gen_pulse_sample(0);
                 sample += gen_pulse_sample(1);
+                sample += gen_triangle_sample();
                 rbuf.samples[rbuf.wcursor] = sample;
                 rbuf.wcursor = (rbuf.wcursor + 1) % RING_BUFFER_SIZE;
             }
@@ -237,11 +278,22 @@ void Apu_Step(int cycle_budget)
         if (cycle == 3728 || cycle == 7456 || cycle == 11185 || cycle == 14914 || cycle == 18640) {
             // clock envelope and triangle lin counter
             if (!(cycle == 14914 && counter_mode == COUNTER_5STEP)) {
-                // TODO
+                // pulse channels
                 for (int channel = 0; channel < 2; channel++) {
                     if (!pulse[channel].const_vol && pulse[channel].volume > 0) {
                         pulse[channel].volume--;
                     }
+                }
+
+                // triangle lin counter
+                if (triangle.reload) {
+                    triangle.lin_counter = triangle.lin_counter_reload;
+                } else if (triangle.lin_counter > 0) {
+                    triangle.lin_counter--;
+                }
+
+                if (!triangle.halt_counter) {
+                    triangle.reload = false;
                 }
             }
 
@@ -275,6 +327,10 @@ void Apu_Step(int cycle_budget)
                         }
                     }
                 }
+            }
+
+            if (!triangle.lin_counter || !triangle.counter) {
+                triangle.enabled = false;
             }
         }
 
@@ -359,6 +415,19 @@ void Apu_Write(u8 data, u16 addr)
         pulse[channel].enabled = true;
         // Reset phase
         pulse[channel].t_phase = 0;
+        break;
+    case 0x4008: // Triangle
+        triangle.lin_counter_reload = data & 0x7F;
+        triangle.halt_counter = (data >> 7) & 0x1;
+        break;
+    case 0x400A: // Triangle
+        triangle.timer = (triangle.timer & 0xFF00) | data;
+        break;
+    case 0x400B: // Triangle
+        triangle.timer = (triangle.timer & 0x00FF) | ((data & 0x7) << 8);
+        triangle.counter = len_table[(data >> 3) & 0x1F]; // TODO???
+        triangle.enabled = true;
+        triangle.reload = true;
         break;
     case 0x4015: // Status Flags
         apuflags = data;
