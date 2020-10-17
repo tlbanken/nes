@@ -9,10 +9,12 @@
 
 #include <math.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include <utils.h>
 #include <apu.h>
 #include <vac.h>
+#include <cpu.h>
 
 #define CHECK_INIT if(!is_init){ERROR("Not Initialized!\n"); EXIT(1);}
 
@@ -77,6 +79,19 @@ typedef struct triangle_channel {
 } triangle_channel_t;
 static triangle_channel_t triangle;
 
+typedef struct noise_channel {
+    bool enabled;
+    bool mute;
+    bool halt_counter;
+    bool const_vol;
+    u8 counter;
+    u8 volume;
+    u8 mode;
+    u16 shift_reg;
+
+} noise_channel_t;
+static noise_channel_t noise;
+
 static bool is_init = false;
 
 // the higher the number, the better the approximation to square wave
@@ -118,9 +133,7 @@ static float gen_pulse_sample(int channel)
 
     // freq calc based on https://wiki.nesdev.com/w/index.php/APU
     float note = CPU_CLOCK_RATE / (16 * (pulse[channel].timer));
-    // float note = 440.0;
     float duty = pulse[channel].duty;
-    // printf("NOTE %fHz %.02f%%\n", note, duty * 100);
 
     float res1 = 0.0f;
     float res2 = 0.0f;
@@ -130,9 +143,6 @@ static float gen_pulse_sample(int channel)
     }
 
     float res = res1 - res2;
-    // TESTING: sin wave
-    // res = sin(note * tau * 2.0 * PI);
-    // printf("Note %f, res %f\n", note, res);
     float volume = 1.0f;
     if (pulse[channel].const_vol) {
         volume = (float) pulse[channel].volume / 15.0f;
@@ -147,7 +157,6 @@ static float gen_triangle_sample()
     }
 
     float note = CPU_CLOCK_RATE / (32.0f * ((float) triangle.timer + 1.0f));
-    // static int t = 0;
     float tau = (float) triangle.t_phase++ / 44100.0f;
 
     float res = 0.0f;
@@ -162,6 +171,26 @@ static float gen_triangle_sample()
     return MASTER_VOLUME * res;
 }
 
+static float gen_noise_sample()
+{
+    if (!noise.enabled) {
+        return 0.0f;
+    }
+    int bit = noise.mode ? 6 : 1;
+    // gen next random sequence
+    // printf("SHIFT %u\n", noise.shift_reg);
+    u16 new = ((noise.shift_reg >> bit) & 0x1) ^ (noise.shift_reg & 0x1);
+    noise.shift_reg >>= 1;
+    noise.shift_reg |= (new << 14);
+    // printf("SHIFT %u\n", noise.shift_reg);
+    // EXIT(0);
+
+    srand(noise.shift_reg);
+    float res = (float) (rand() % 256) / 256.0f;
+    // printf("NOISE %f\n", res);
+    return res;
+}
+
 static void audio_callback(u8 *stream, int len)
 {
     assert(rbuf.wcursor != rbuf.rcursor);
@@ -171,9 +200,6 @@ static void audio_callback(u8 *stream, int len)
     // keep read cursor 1 before write cursor
     ready--;
 
-    // static int t = 0;
-
-    // printf("Len: %d | Ready: %d, R: %d, W: %d\n", len / 4, ready, rbuf.rcursor, rbuf.wcursor);
     if (ready == 0 || (len / 4) > ready) {
         memset(stream, Vac_GetSilence(), len);
         return;
@@ -182,9 +208,6 @@ static void audio_callback(u8 *stream, int len)
     float *streamf32 = (float *) stream;
     int i;
     for (i = 0; i < (len / 4); i++) {
-        // float tau = (float) t++ / 44100.0;
-        // float sample = sin(440.0 * tau * 2.0 * PI);
-        // streamf32[i] = sample;
         streamf32[i] = rbuf.samples[rbuf.rcursor];
         rbuf.rcursor = (rbuf.rcursor + 1) % RING_BUFFER_SIZE;
     }
@@ -211,6 +234,8 @@ void Apu_Reset()
     memset(&pulse[0], 0, sizeof(pulse_channel_t));
     memset(&pulse[1], 0, sizeof(pulse_channel_t));
     memset(&triangle, 0, sizeof(triangle_channel_t));
+    memset(&noise, 0, sizeof(noise_channel_t));
+    noise.shift_reg = 0x01;
 
     // reset ring buffer
     memset(rbuf.samples, 0, RING_BUFFER_SIZE * sizeof(float));
@@ -225,8 +250,7 @@ void Apu_Step(int cycle_budget, u32 keystate)
 #endif
     // debug mute channels
     static unsigned int last_ms = 0;
-    unsigned int passed = 0;
-    if ((passed = Vac_MsPassedFrom(last_ms)) >= 200) {
+    if (Vac_MsPassedFrom(last_ms) >= 200) {
         if (keystate & KEY_MUTE_1) {
             pulse[0].mute = !pulse[0].mute;
             last_ms = Vac_Now();
@@ -269,6 +293,7 @@ void Apu_Step(int cycle_budget, u32 keystate)
                 sample += gen_pulse_sample(0);
                 sample += gen_pulse_sample(1);
                 sample += gen_triangle_sample();
+                // sample += gen_noise_sample();
                 rbuf.samples[rbuf.wcursor] = sample;
                 rbuf.wcursor = (rbuf.wcursor + 1) % RING_BUFFER_SIZE;
             }
@@ -314,7 +339,7 @@ void Apu_Step(int cycle_budget, u32 keystate)
                         u8 change = pulse[channel].timer >> pulse[channel].sweep.shift;
                         // negate if needed
                         change = pulse[channel].sweep.negate ? ~change + 1 : change;
-                        // pulse[0] should use 1's complement
+                        // pulse[0] should use 1's complement for some reason :/
                         if (channel == 0) {
                             change--;
                         }
@@ -327,10 +352,24 @@ void Apu_Step(int cycle_budget, u32 keystate)
                         }
                     }
                 }
+
+                // noise counter
+                if (noise.counter == 0) {
+                    // mute
+                    noise.enabled = false;
+                } else if (!noise.halt_counter) {
+                    noise.counter--;
+                }
             }
 
             if (!triangle.lin_counter || !triangle.counter) {
                 triangle.enabled = false;
+            }
+
+            if (cycle == 14914 && COUNTER_4STEP && !irq_disabled) {
+                ERROR("HEY THIS HAS AN INTERRUPT REMEMBER TO COME AND IMPLEMENT THIS\n");
+                EXIT(1);
+                Cpu_Irq();
             }
         }
 
@@ -388,7 +427,7 @@ void Apu_Write(u8 data, u16 addr)
             pulse[channel].duty = 0.50;
             break;
         case 0b11:
-            pulse[channel].duty = -0.25;
+            pulse[channel].duty = 0.75;
             break;
         }
         pulse[channel].const_vol = (data & 0x10) != 0;
@@ -429,16 +468,32 @@ void Apu_Write(u8 data, u16 addr)
         triangle.enabled = true;
         triangle.reload = true;
         break;
+    case 0x400C: // Noise
+        noise.halt_counter = (data & 0x20) != 0;
+        noise.const_vol = (data & 0x10) != 0;
+        noise.volume = data & 0x0F;
+        break;
+    case 0x400E: // Noise
+        noise.mode = (data & 0x80) != 0;
+        // TODO: period
+        break;
+    case 0x400F: // Noise
+        noise.counter = (data >> 3) & 0x1F;
+        noise.enabled = true;
+        break;
     case 0x4015: // Status Flags
         apuflags = data;
         if (!(apuflags & FLAGS_PULSE1)) {
             // TODO: silence pulse 1
+            pulse[0].enabled = false;
         }
         if (!(apuflags & FLAGS_PULSE2)) {
             // TODO: silence pulse 2
+            pulse[1].enabled = false;
         }
         if (!(apuflags & FLAGS_TRIANGLE)) {
             // TODO: silence triangle
+            triangle.enabled = false;
         }
         if (!(apuflags & FLAGS_NOISE)) {
             // TODO: silence noise
