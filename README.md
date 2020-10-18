@@ -1,6 +1,15 @@
 # NES Emulator
 A nes emulator written in C and the SDL2 library. I created this as a hobby project for me to learn more about the nes architecture and emulation in general.
-
+# Demos
+![Super Mario Bros](demos/nes_demo_smb1.png)
+![Castlevania](demos/nes_demo_cv1.png)
+![Castlevania](demos/nes_demo_cv2.png)
+![Duck Tales](demos/nes_demo_dt1.png)
+![Metal Gear](demos/nes_demo_mg1.png)
+![Metal Gear](demos/nes_demo_mg2.png)
+# Demos with Debug View
+![Super Mario Bros DEBUG](demos/nes_demo_dbg_smb.png)
+![Metal Gear DEBUG](demos/nes_demo_dgb_mg.png)
 # Resources
  * [Nesdev](http://wiki.nesdev.com/w/index.php/Nesdev_Wiki) is THE go-to resource for nes emulation and contains very little code so you don't "spoil" the fun of writing your own emulator.
  * [javidx9](https://www.youtube.com/channel/UC-yuWVUplUJZvieEligKBkA) did a fantastic [youtube series](https://www.youtube.com/watch?v=F8kx56OZQhg) on his nes emulator. This was a great resource for me when I hit a wall (especially the ppu). He provides a conceptual overview as well as some implementation details.
