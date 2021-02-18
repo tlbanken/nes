@@ -7,3 +7,4 @@ roms
 testroms
 gmon.out
 extern/SDL/*
+build
