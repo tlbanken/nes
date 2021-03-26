@@ -30,8 +30,11 @@ A nes emulator written in C and the SDL2 library. I created this as a hobby proj
   * [gcc](https://gcc.gnu.org/)
   * Linux
   * [SDL2](https://www.libsdl.org/)
-# Build
-`make build`
+# Build with CMake
+1. `mkdir build`
+2. `cd build`
+3. `cmake ..`
+4. `make`
 # Run
 `nes <path to rom>`
 # Key Bindings
