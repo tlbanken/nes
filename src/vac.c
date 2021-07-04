@@ -188,7 +188,7 @@ static u32 unset_key(SDL_Keycode keycode, u32 keystate)
 
 void Vac_Init(const char *title, bool debug_display)
 {
-    pxscale = debug_display ? 3 : 4;
+    pxscale = debug_display ? 2 : 3;
     debug_on = debug_display;
 
     int rc;

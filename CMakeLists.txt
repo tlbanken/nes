@@ -7,6 +7,8 @@ project(NES VERSION 0.1.0)
 
 add_executable(nes)
 
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CSS_FLAGS_RELEASE} -O3")
+
 # subdirs
 add_subdirectory("${PROJECT_SOURCE_DIR}/src")
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern")
