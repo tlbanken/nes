@@ -100,7 +100,8 @@ static void run(const char *title, bool dbg_mode)
                 }
             }
             frame_finished = Ppu_Step(3 * cycles);
-            Apu_Step(cycles / 2, kc);
+            // TODO: Turn off APU for now while sound is unstable
+            // Apu_Step(cycles / 2, kc);
             cpf += cycles;
             cycles = 0;
         }

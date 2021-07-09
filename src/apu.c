@@ -237,6 +237,11 @@ void Apu_Reset()
     memset(&noise, 0, sizeof(noise_channel_t));
     noise.shift_reg = 0x01;
 
+    // TODO: For now, start with sound muted to avoid breaking anyones speakers :/
+    // pulse[0].mute = true;
+    // pulse[1].mute = true;
+    // triangle.mute = true;
+
     // reset ring buffer
     memset(rbuf.samples, 0, RING_BUFFER_SIZE * sizeof(float));
     rbuf.wcursor = 1;
@@ -293,7 +298,7 @@ void Apu_Step(int cycle_budget, u32 keystate)
                 sample += gen_pulse_sample(0);
                 sample += gen_pulse_sample(1);
                 sample += gen_triangle_sample();
-                // sample += gen_noise_sample();
+                sample += gen_noise_sample();
                 rbuf.samples[rbuf.wcursor] = sample;
                 rbuf.wcursor = (rbuf.wcursor + 1) % RING_BUFFER_SIZE;
             }
