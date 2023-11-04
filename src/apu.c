@@ -63,6 +63,8 @@ typedef struct pulse_channel {
         u8 negate: 1;
         u8 shift: 3;
     } sweep;
+    // helper
+    int warm_up;
 } pulse_channel_t;
 static pulse_channel_t pulse[2] = {0};
 
@@ -76,6 +78,9 @@ typedef struct triangle_channel {
     u16 timer;
     u16 counter;
     int t_phase;
+    // helper
+    int warm_up;
+    int warm_up_step;
 } triangle_channel_t;
 static triangle_channel_t triangle;
 
@@ -97,7 +102,7 @@ static bool is_init = false;
 // the higher the number, the better the approximation to square wave
 #define SQR_ITER 20
 #define TRI_ITER 20
-#define MASTER_VOLUME 1.0f
+#define MASTER_VOLUME 0.1f
 #define CPU_CLOCK_RATE 1789773
 #define PI 3.14159265f
 
@@ -146,7 +151,13 @@ static float gen_pulse_sample(int channel)
     float volume = 1.0f;
     if (pulse[channel].const_vol) {
         volume = (float) pulse[channel].volume / 15.0f;
-    }
+    } 
+    // warm_up_cap will remove the harsh clicks/pops at the start and end of note.
+    // The number is arbitrary, too low and the pops remain, but too high and the attack is too soft.
+    const int warm_up_cap = 250;
+    volume *= (pulse[channel].warm_up / (float)warm_up_cap);
+    pulse[channel].warm_up += 1;
+    if (pulse[channel].warm_up > warm_up_cap) pulse[channel].warm_up = warm_up_cap;
     return volume * MASTER_VOLUME * res;
 }
 
@@ -168,12 +179,23 @@ static float gen_triangle_sample()
             * fast_sin(2.0f * PI * note * (float) n * tau);
     }
     res *= (8.0f / (PI * PI));
+    // TODO: how to deal with pop on release? Need decay or something...
+    // warm_up_cap will remove the harsh clicks/pops. 
+    // The number is arbitrary, too low and the pops remain, but too high and the attack is too soft.
+    // const int warm_up_cap = 250;
+    // res *= (triangle.warm_up / (float)warm_up_cap);
+    // triangle.warm_up += triangle.warm_up_step;
+    // ERROR("WARMUP: %d\n", triangle.warm_up);
+    // if (triangle.warm_up > warm_up_cap) triangle.warm_up = warm_up_cap;
+    // if (triangle.warm_up < 0) {
+    //     triangle.enabled = false;
+    // }
     return MASTER_VOLUME * res;
 }
 
 static float gen_noise_sample()
 {
-    if (!noise.enabled) {
+    if (!noise.enabled || noise.mute) {
         return 0.0f;
     }
     int bit = noise.mode ? 6 : 1;
@@ -237,10 +259,11 @@ void Apu_Reset()
     memset(&noise, 0, sizeof(noise_channel_t));
     noise.shift_reg = 0x01;
 
-    // TODO: For now, start with sound muted to avoid breaking anyones speakers :/
+    // TODO: Turn off channels while figuring this out...
     // pulse[0].mute = true;
     // pulse[1].mute = true;
     // triangle.mute = true;
+    noise.mute = true;
 
     // reset ring buffer
     memset(rbuf.samples, 0, RING_BUFFER_SIZE * sizeof(float));
@@ -255,20 +278,20 @@ void Apu_Step(int cycle_budget, u32 keystate)
 #endif
     // debug mute channels
     static unsigned int last_ms = 0;
-    if (Vac_MsPassedFrom(last_ms) >= 200) {
-        if (keystate & KEY_MUTE_1) {
-            pulse[0].mute = !pulse[0].mute;
-            last_ms = Vac_Now();
-        }
-        if (keystate & KEY_MUTE_2) {
-            pulse[1].mute = !pulse[1].mute;
-            last_ms = Vac_Now();
-        }
-        if (keystate & KEY_MUTE_3) {
-            triangle.mute = !triangle.mute;
-            last_ms = Vac_Now();
-        }
-    }
+    // if (Vac_MsPassedFrom(last_ms) >= 200) {
+    //     if (keystate & KEY_MUTE_1) {
+    //         pulse[0].mute = !pulse[0].mute;
+    //         last_ms = Vac_Now();
+    //     }
+    //     if (keystate & KEY_MUTE_2) {
+    //         pulse[1].mute = !pulse[1].mute;
+    //         last_ms = Vac_Now();
+    //     }
+    //     if (keystate & KEY_MUTE_3) {
+    //         triangle.mute = !triangle.mute;
+    //         last_ms = Vac_Now();
+    //     }
+    // }
 
     // The cpu clocks at about 1.789 Mhz (cycles per sec)
     // The sample rate is 44.1 Khz (samples per sec)
@@ -457,6 +480,7 @@ void Apu_Write(u8 data, u16 addr)
         pulse[channel].timer = (pulse[channel].timer & 0x00FF) | ((data & 0x7) << 8);
         pulse[channel].counter = len_table[(data >> 3) & 0x1F];
         pulse[channel].enabled = true;
+        pulse[channel].warm_up = 0;
         // Reset phase
         pulse[channel].t_phase = 0;
         break;
@@ -472,6 +496,8 @@ void Apu_Write(u8 data, u16 addr)
         triangle.counter = len_table[(data >> 3) & 0x1F]; // TODO???
         triangle.enabled = true;
         triangle.reload = true;
+        triangle.warm_up = 0;
+        triangle.warm_up_step = 1;
         break;
     case 0x400C: // Noise
         noise.halt_counter = (data & 0x20) != 0;
@@ -502,6 +528,7 @@ void Apu_Write(u8 data, u16 addr)
         }
         if (!(apuflags & FLAGS_NOISE)) {
             // TODO: silence noise
+            noise.enabled = false;
         }
         if (!(apuflags & FLAGS_DMC)) {
             // TODO: silence DMC
