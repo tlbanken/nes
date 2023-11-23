@@ -7,8 +7,10 @@
  * Wrapper framework for Video, Audio, and Controllers
  */
 
+#include <string.h>
+
 #include <vac.h>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #define SDL_PERROR ERROR("SDL ERROR: %s\n", SDL_GetError())
 
@@ -29,7 +31,7 @@ static nes_color_t pt_vbuf[2][128*128];
 static nes_color_t nt_vbuf[2][RES_X*RES_Y];
 
 // audio
-static SDL_AudioDeviceID audio_dev;
+static SDL_AudioStream *audio_stream;
 static u8 dev_silence = 0;
 static void audio_callback(void *usedata, u8 *stream, int len);
 
@@ -200,25 +202,18 @@ void Vac_Init(const char *title, bool debug_display)
     }
 
     // init audio
-    SDL_AudioSpec want, have;
-    memset(&want, 0, sizeof(want));
-    want.freq = 44100;
-    want.format = AUDIO_F32;
-    want.channels = 1;
-    want.samples = 512; // TODO: find best val (must be power of 2)
-    want.callback = audio_callback;
-    audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
-    if (audio_dev == 0) {
-        ERROR("Failed to open audio: %s\n", SDL_GetError());
+    // SDL_AudioSpec want, have;
+    // memset(&want, 0, sizeof(want));
+    // want.freq = 44100;
+    // want.format = AUDIO_F32;
+    // want.channels = 1;
+    // want.samples = 512; // TODO: find best val (must be power of 2)
+    const SDL_AudioSpec spec = { SDL_AUDIO_F32, 1, 44100 };
+    audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_OUTPUT, &spec, NULL, NULL);
+    if (audio_stream == NULL) {
+        ERROR("Failed to create audio stream: %s\n", SDL_GetError());
         EXIT(1);
     }
-    if (have.format != want.format) {
-        WARNING("FLOAT32 audio format not supported!\n");
-    }
-    if (have.samples != want.samples) {
-        WARNING("Got %d sample block, wanted %d sample block\n", have.samples, want.samples);
-    }
-    dev_silence = have.silence;
 
     int wh = scale(RES_Y);
     int ww = scale(RES_X);
@@ -226,22 +221,20 @@ void Vac_Init(const char *title, bool debug_display)
         ww += (scale_dbg(DBG_RES_X));
     }
     // create window
-    window = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                ww, wh, SDL_WINDOW_SHOWN);
+    window = SDL_CreateWindow(title, ww, wh, 0);
     if (window == NULL) {
         ERROR("%s\n", SDL_GetError());
         EXIT(1);
     }
 
     // create renderer
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    // renderer = SDL_CreateRenderer(window, -1, 0);
+    renderer = SDL_CreateRenderer(window, NULL, SDL_RENDERER_ACCELERATED);
     if (renderer == NULL) {
         ERROR("%s\n", SDL_GetError());
         EXIT(1);
     }
 
-    SDL_PauseAudioDevice(audio_dev, 0);
+    SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(audio_stream));
 }
 
 void Vac_Free()
@@ -258,14 +251,14 @@ u32 Vac_Poll()
     SDL_Keycode keycode;
     if (SDL_PollEvent(&e)) {
         switch (e.type) {
-        case SDL_QUIT:
+        case SDL_EVENT_QUIT:
             EXIT(0);
             break;
-        case SDL_KEYDOWN:
+        case SDL_EVENT_KEY_DOWN:
             keycode = e.key.keysym.sym;
             keystate = set_key(keycode, keystate);
             break;
-        case SDL_KEYUP:
+        case SDL_EVENT_KEY_UP:
             keycode = e.key.keysym.sym;
             keystate = unset_key(keycode, keystate);
             break;
@@ -289,7 +282,7 @@ void Vac_Refresh()
                 EXIT(1);
             }
 
-            SDL_Rect rectangle;
+            SDL_FRect rectangle;
             rectangle.x = scale(x);
             rectangle.y = scale(y);
             rectangle.w = scale(1);
@@ -315,7 +308,7 @@ void Vac_Refresh()
                         EXIT(1);
                     }
 
-                    SDL_Rect rect;
+                    SDL_FRect rect;
                     rect.x = scale_dbg(x + 1) + scale(RES_X) + (scale_dbg(128) * table_side
                         + scale_dbg(1) * table_side);
                     rect.y = scale_dbg(y + 1);
@@ -403,26 +396,12 @@ void Vac_SetWindowTitle(const char *title)
 // *********************************************************
 // *** AUDIO ***
 // *********************************************************
-static audio_callback_t apu_audio_callback = NULL; 
 
-static void audio_callback(void *userdata, u8 *stream, int len)
-{
-    (void) userdata;
-    // make sure a callback handler is set
-    if (apu_audio_callback == NULL) {
-        memset(stream, dev_silence, len);
-    } else {
-        apu_audio_callback(stream, len);
+void Vac_QueueAudio(const void* data, uint32_t len) {
+    int rc = SDL_PutAudioStreamData(audio_stream, data, len);
+    if (rc < 0) {
+        ERROR("Failed to queue audio: %s/n", SDL_GetError());
+        EXIT(1);
     }
-}
-
-void Vac_SetAudioCallback(audio_callback_t a)
-{
-    apu_audio_callback = a;
-}
-
-u8 Vac_GetSilence()
-{
-    return dev_silence;
 }
 

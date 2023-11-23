@@ -106,14 +106,9 @@ static bool is_init = false;
 #define CPU_CLOCK_RATE 1789773
 #define PI 3.14159265f
 
-// ring buffer
-#define RING_BUFFER_SIZE 4096 // Keep in mind the num samples def in vac.c
-typedef struct ring_buffer {
-    float samples[RING_BUFFER_SIZE];
-    int wcursor;
-    int rcursor;
-} ring_buffer_t;
-static ring_buffer_t rbuf;
+// audio buffer
+#define AUDIO_BUFFER_SIZE 4096 // Keep in mind the num samples def in vac.c
+static float audio_buf[AUDIO_BUFFER_SIZE];
 
 // fast sine approx as described here:
 // https://www.youtube.com/watch?v=1xlCVBIF_ig
@@ -213,34 +208,12 @@ static float gen_noise_sample()
     return res;
 }
 
-static void audio_callback(u8 *stream, int len)
-{
-    assert(rbuf.wcursor != rbuf.rcursor);
-    int ready = rbuf.wcursor - rbuf.rcursor;
-    // account for wrapping
-    ready = ready < 0 ? RING_BUFFER_SIZE + ready : ready;
-    // keep read cursor 1 before write cursor
-    ready--;
-
-    if (ready == 0 || (len / 4) > ready) {
-        memset(stream, Vac_GetSilence(), len);
-        return;
-    }
-
-    float *streamf32 = (float *) stream;
-    int i;
-    for (i = 0; i < (len / 4); i++) {
-        streamf32[i] = rbuf.samples[rbuf.rcursor];
-        rbuf.rcursor = (rbuf.rcursor + 1) % RING_BUFFER_SIZE;
-    }
-}
-
 void Apu_Init()
 {
     is_init = true;
 
     // setup audio callback
-    Vac_SetAudioCallback(audio_callback);
+    // Vac_SetAudioCallback(audio_callback);
 
     Apu_Reset();
 }
@@ -266,9 +239,7 @@ void Apu_Reset()
     noise.mute = true;
 
     // reset ring buffer
-    memset(rbuf.samples, 0, RING_BUFFER_SIZE * sizeof(float));
-    rbuf.wcursor = 1;
-    rbuf.rcursor = 0;
+    memset(audio_buf, 0, AUDIO_BUFFER_SIZE * sizeof(float));
 }
 
 void Apu_Step(int cycle_budget, u32 keystate)
@@ -278,20 +249,20 @@ void Apu_Step(int cycle_budget, u32 keystate)
 #endif
     // debug mute channels
     static unsigned int last_ms = 0;
-    // if (Vac_MsPassedFrom(last_ms) >= 200) {
-    //     if (keystate & KEY_MUTE_1) {
-    //         pulse[0].mute = !pulse[0].mute;
-    //         last_ms = Vac_Now();
-    //     }
-    //     if (keystate & KEY_MUTE_2) {
-    //         pulse[1].mute = !pulse[1].mute;
-    //         last_ms = Vac_Now();
-    //     }
-    //     if (keystate & KEY_MUTE_3) {
-    //         triangle.mute = !triangle.mute;
-    //         last_ms = Vac_Now();
-    //     }
-    // }
+    if (Vac_MsPassedFrom(last_ms) >= 200) {
+        if (keystate & KEY_MUTE_1) {
+            pulse[0].mute = !pulse[0].mute;
+            last_ms = Vac_Now();
+        }
+        if (keystate & KEY_MUTE_2) {
+            pulse[1].mute = !pulse[1].mute;
+            last_ms = Vac_Now();
+        }
+        if (keystate & KEY_MUTE_3) {
+            triangle.mute = !triangle.mute;
+            last_ms = Vac_Now();
+        }
+    }
 
     // The cpu clocks at about 1.789 Mhz (cycles per sec)
     // The sample rate is 44.1 Khz (samples per sec)
@@ -305,25 +276,19 @@ void Apu_Step(int cycle_budget, u32 keystate)
     // state vars
     static int cycle = 0;
 
+    int abuf_cursor = 0;
     for (int i = 0; i < cycle_budget; i++) {
         if (cycle % 20 == 0) {
-            int dist = rbuf.wcursor - rbuf.rcursor;
-            if (dist < 0) {
-                dist += RING_BUFFER_SIZE;
-            }
-            // make sure we have enough buffer space to avoid starvation
-            while (dist++ < ((RING_BUFFER_SIZE / 2) - 1)) {
-                // gen sample
-                // static int t = 0;
-                // float tau = (float) t++ / 44100.0; // will this work?
-                float sample = 0;
-                // sample += fast_sin(240.0 * tau * 2.0 * PI);
-                sample += gen_pulse_sample(0);
-                sample += gen_pulse_sample(1);
-                sample += gen_triangle_sample();
-                sample += gen_noise_sample();
-                rbuf.samples[rbuf.wcursor] = sample;
-                rbuf.wcursor = (rbuf.wcursor + 1) % RING_BUFFER_SIZE;
+            float sample = 0;
+            sample += gen_pulse_sample(0);
+            sample += gen_pulse_sample(1);
+            sample += gen_triangle_sample();
+            sample += gen_noise_sample();
+            audio_buf[abuf_cursor] = sample;
+            abuf_cursor++;
+            if (abuf_cursor >= AUDIO_BUFFER_SIZE) {
+                ERROR("Out of AUDIO Buffer!");
+                EXIT(1);
             }
         }
 
@@ -406,6 +371,9 @@ void Apu_Step(int cycle_budget, u32 keystate)
         // https://wiki.nesdev.com/w/index.php/APU_Frame_Counter)
         cycle = (cycle + 1) % (counter_mode == COUNTER_5STEP ? 18640 : 14914);
     }
+
+    // queue audio samples
+    Vac_QueueAudio(audio_buf, abuf_cursor * sizeof(float));
 }
 
 u8 Apu_Read(u16 addr)

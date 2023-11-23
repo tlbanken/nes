@@ -10,7 +10,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <SDL.h>
+#include <SDL3/SDL_main.h>
 
 #include <utils.h>
 #include <mem.h>
